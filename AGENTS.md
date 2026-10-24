@@ -139,44 +139,13 @@ Reuse existing `qs.Ui`, `qs.Commons`, `Style`, `BorderSurface`, `Button`, `Panel
 6. Request the `code-reviewer` subagent after implementation and before delivery.
 7. Do not silently restart or silently synchronize the live plugin. Announce live synchronization and list source/destination paths and files first.
 
-## Delivery approvals
+## Delivery
 
-Treat every delivery phase as a separate authorization boundary. Approval for one phase never authorizes a later phase. A bundled request still requires confirmation immediately before each phase.
+An explicit request to commit, push, publish a release, or update the live plugin authorizes those actions. A bundled request authorizes all named phases; do not ask for repeated confirmation between them. Continue until the requested delivery is complete unless a concrete new risk or missing information blocks it.
 
-### Branch or worktree preparation
+Before delivery, identify the exact changes and destinations, run relevant checks, and report material limitations. Preserve unrelated work and never copy private identities, keys, Ratchet state, or local history. Fetch and inspect the remote before pushing; never force-push main or overwrite unrelated remote work. Announce live synchronization paths, files, and expected reload/restart before applying it.
 
-Show the intended branch and worktree path. Obtain explicit approval before creating, deleting, resetting, rebasing, or otherwise mutating a branch or worktree.
-
-### Commit
-
-Before committing, report:
-
-- the exact files staged or the staged diff summary
-- validation and test results run after the final change
-- the proposed English commit subject
-
-Then obtain explicit approval immediately before creating the local commit. Do not treat “finish”, “implement”, or a general delivery request as commit approval when this report has not just been confirmed.
-
-### Push
-
-After a local commit, report:
-
-- exact commit hash(es)
-- source branch
-- destination remote and branch
-- validation status and worktree status
-
-Obtain a new explicit approval immediately before pushing. Never force-push `main`. Fetch and inspect the remote before pushing; do not overwrite unrelated remote work.
-
-### Live synchronization
-
-Live synchronization is a separate delivery phase from commit and push. Report the exact source path, destination path, files, and whether a helper restart/reload is expected. Obtain explicit approval immediately before copying or reloading live files. Never copy private identities, keys, Ratchet state, or local history.
-
-### Pull request and merge
-
-For a pull request, report base, head, title, body summary, and issue-closing keywords. Obtain new explicit approval before creating, editing, commenting on, or mutating the PR.
-
-For a merge, wait for required checks and reviews, report their results and intended merge method, then obtain new explicit approval immediately before merging. PR approval or a general request to finish is not merge authorization.
+Routine branch or worktree preparation may proceed when needed for the authorized task. Do not delete or reset unrelated work. PRs and merges require user intent covering those actions, but no additional per-phase approval ceremony.
 
 ## Verification
 
