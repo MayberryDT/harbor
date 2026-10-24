@@ -53,6 +53,7 @@ int omaq_tox_friend_online(struct omaq_tox *t, uint32_t friend_number);
 int omaq_tox_friend_status(struct omaq_tox *t, uint32_t friend_number);
 int omaq_tox_nospam_rotate(struct omaq_tox *t);
 int omaq_tox_send(struct omaq_tox *t, uint32_t friend_number, const char *text);
+int omaq_tox_send_pending(const struct omaq_tox *t);
 int omaq_tox_save(struct omaq_tox *t);
 int omaq_tox_online(const struct omaq_tox *t);
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install first-map rules for OmaQ windows and focus one exact chat on request.
+# Install first-map rules for Harbor windows and focus one exact chat on request.
 # Existing windows are never forced back to floating after the user tiles them.
 set -u
 export LC_ALL=C
@@ -26,7 +26,7 @@ if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
   chmod 700 -- "$runtime_root" 2>/dev/null || exit 1
 fi
 [[ -d "$runtime_root" && ! -L "$runtime_root" && -O "$runtime_root" ]] || exit 1
-RULE_DIR="$runtime_root/omaq-hypr"
+RULE_DIR="$runtime_root/harbor-hypr"
 mkdir -p -- "$RULE_DIR" || exit 1
 [[ -d "$RULE_DIR" && ! -L "$RULE_DIR" && -O "$RULE_DIR" ]] || exit 1
 chmod 700 -- "$RULE_DIR" 2>/dev/null || exit 1
@@ -164,8 +164,8 @@ install_rules() {
   if (( LUA )); then
     # Named Lua rules are removed when their returned handles are collected.
     # Retain both handles in Hyprland's global Lua state across hyprctl calls.
-    hyprctl eval 'omaq_window_rules = omaq_window_rules or {}; if omaq_window_rules.demo_v4 == nil then omaq_window_rules.demo_v4 = hl.window_rule({ name = "omaq-float-demo-v4", match = { initial_title = "^OmaQ demo$" }, float = true, no_anim = true }) else omaq_window_rules.demo_v4:set_enabled(true) end' >/dev/null || return 1
-    hyprctl eval 'omaq_window_rules = omaq_window_rules or {}; if omaq_window_rules.chat_v5 ~= nil then omaq_window_rules.chat_v5:set_enabled(false) end; if omaq_window_rules.chat_v6 == nil then omaq_window_rules.chat_v6 = hl.window_rule({ name = "omaq-float-chat-v6", match = { initial_title = "^OmaQ chat.*$" }, float = true }) else omaq_window_rules.chat_v6:set_enabled(true) end' >/dev/null || return 1
+    hyprctl eval 'harbor_window_rules = harbor_window_rules or {}; if harbor_window_rules.demo_v4 == nil then harbor_window_rules.demo_v4 = hl.window_rule({ name = "harbor-float-demo-v4", match = { initial_title = "^Harbor demo$" }, float = true, no_anim = true }) else harbor_window_rules.demo_v4:set_enabled(true) end' >/dev/null || return 1
+    hyprctl eval 'harbor_window_rules = harbor_window_rules or {}; if harbor_window_rules.chat_v5 ~= nil then harbor_window_rules.chat_v5:set_enabled(false) end; if harbor_window_rules.chat_v6 == nil then harbor_window_rules.chat_v6 = hl.window_rule({ name = "harbor-float-chat-v6", match = { initial_title = "^Harbor chat.*$" }, float = true }) else harbor_window_rules.chat_v6:set_enabled(true) end' >/dev/null || return 1
     return 0
   fi
 
@@ -183,10 +183,10 @@ install_rules() {
   )
   previous=$(cat -- "$RULE_FLAG" 2>/dev/null || true)
   if [[ "$previous" != "$generation" ]]; then
-    if ! hyprctl keyword 'windowrulev2 = unset, title:^(OmaQ chat.*)$' >/dev/null ||
-       ! hyprctl keyword 'windowrulev2 = float, title:^(OmaQ demo)$' >/dev/null ||
-       ! hyprctl keyword 'windowrulev2 = noanim, title:^(OmaQ demo)$' >/dev/null ||
-       ! hyprctl keyword 'windowrulev2 = float, title:^(OmaQ chat.*)$' >/dev/null; then
+    if ! hyprctl keyword 'windowrulev2 = unset, title:^(Harbor chat.*)$' >/dev/null ||
+       ! hyprctl keyword 'windowrulev2 = float, title:^(Harbor demo)$' >/dev/null ||
+       ! hyprctl keyword 'windowrulev2 = noanim, title:^(Harbor demo)$' >/dev/null ||
+       ! hyprctl keyword 'windowrulev2 = float, title:^(Harbor chat.*)$' >/dev/null; then
       flock -u 9
       exec 9>&-
       return 1
@@ -253,7 +253,7 @@ if [[ "$MODE" == "list-geometry" ]]; then
   (( ${#clients} <= 1048576 && ${#monitors} <= 262144 )) || exit 3
   jq -cn --argjson clients "$clients" --argjson monitors "$monitors" '
     [$clients[] |
-      select(((.title // "") | startswith("OmaQ chat — ")) and
+      select(((.title // "") | startswith("Harbor chat — ")) and
         ((.at // []) | length) == 2 and ((.size // []) | length) == 2) |
       . as $client |
       {title: .title, x: .at[0], y: .at[1], width: .size[0], height: .size[1],

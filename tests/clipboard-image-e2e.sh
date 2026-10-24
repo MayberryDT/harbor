@@ -53,11 +53,11 @@ chmod 755 "$tmp/bin/wl-paste"
 cat >"$tmp/shell.qml" <<'QML'
 import QtQuick
 import Quickshell
-import "." as OmaQ
+import "." as Harbor
 import "pages" as Pages
 
 ShellRoot {
-  OmaQ.Service { id: service }
+  Harbor.Service { id: service }
   Item {
     Pages.ChatPage {
       id: page

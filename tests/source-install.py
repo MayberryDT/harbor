@@ -452,13 +452,13 @@ class SourceInstallTests(unittest.TestCase):
             config = config_dir / "shell.json"
             config.write_text(
                 '{"version":1,"bar":{"layout":{"left":[],"center":[],'
-                '"right":[{"id":"hancore.omaq"}]}},"plugins":[]}\n',
+                '"right":[{"id":"io.zet.harbor"}]}},"plugins":[]}\n',
                 encoding="utf-8",
             )
             config.chmod(0o600)
             with mock.patch.object(MODULE.Path, "home", return_value=home):
                 with self.assertRaisesRegex(
-                    MODULE.InstallError, "enables OmaQ before installation"
+                    MODULE.InstallError, "enables Harbor before installation"
                 ):
                     MODULE.require_persisted_plugin_disabled()
 
@@ -853,7 +853,7 @@ class SourceInstallTests(unittest.TestCase):
         success = subprocess.CompletedProcess(
             [],
             0,
-            b'[{"id":"hancore.omaq","enabled":false,'
+            b'[{"id":"io.zet.harbor","enabled":false,'
             b'"firstParty":false,"kinds":["bar-widget"]}]\n',
             b"",
         )

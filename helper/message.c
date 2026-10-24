@@ -77,7 +77,7 @@ static int message_append_id_reply_kind(const char *home, const char *conv_id,
 					const char *message_id, const char *reply_id,
 					const char *kind, int64_t timestamp)
 {
-	char esc_id[128], esc_from[256], esc_text[2800], esc_reply[128], line[3400];
+	char esc_id[128], esc_from[256], esc_text[HARBOR_ESC_MAX], esc_reply[128], line[HARBOR_EVENT_MAX];
 	const char *reply = reply_id ? reply_id : "";
 	const char *message_kind = kind ? kind : "";
 	int wr;

@@ -33,7 +33,7 @@ from .layout import Layout, Pane
 TYPING_SEND_EVERY = 3.0
 TYPING_IDLE = 3.0
 STATUS_SECONDS = 6.0
-COMMAND = "omaq-connect"
+COMMAND = "harbor-connect"
 CONFIRM_SECONDS = 15
 HUSH_SECONDS = 0.3
 TIP_SECONDS = 8
@@ -41,8 +41,8 @@ ZOOM_SECONDS = 4
 THEME_RETRIES = 3
 EXIT_WAIT = 20.0
 SETTLE_SECONDS = 5.0
-UNCONFIRMED_EXIT = "could not confirm that OmaQ went offline; it may still be running"
-UNCOORDINATED_EXIT = "another omaq-connect is still quitting; OmaQ may still be running"
+UNCONFIRMED_EXIT = "could not confirm that Harbor went offline; it may still be running"
+UNCOORDINATED_EXIT = "another harbor-connect is still quitting; Harbor may still be running"
 
 
 EVENT_HANDLERS = {
@@ -365,7 +365,7 @@ class App:
             return False
         env = dict(os.environ, PATH="/usr/bin:/bin", OMARCHY_SHELL_IPC_TIMEOUT="0.3s")
         try:
-            result = subprocess.run([BAR_PROBE, "hancore.omaq", "status"], env=env, stdin=subprocess.DEVNULL,
+            result = subprocess.run([BAR_PROBE, "io.zet.harbor", "status"], env=env, stdin=subprocess.DEVNULL,
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
         except (OSError, subprocess.TimeoutExpired):
             return True
@@ -743,7 +743,7 @@ class App:
             self.dirty = True
             return True
         if not quiet:
-            self.say("This is the last pane; :quit quits OmaQ")
+            self.say("This is the last pane; :quit quits Harbor")
         self.dirty = True
         return False
 
@@ -923,7 +923,7 @@ class App:
         if self.presence.others_alive() or not self.owned_by_cli():
             return
         if self.bar_attached():
-            self.exit_note = "%s: OmaQ keeps running for the bar" % COMMAND
+            self.exit_note = "%s: Harbor keeps running for the bar" % COMMAND
             return
         request = "cli-exit-" + secrets.token_hex(8)
         if not self.send({"op": "helper.shutdown_if_no_groups", "id": self.instance, "request": request}):
@@ -942,11 +942,13 @@ class App:
                     self.presence.clear_started()
                     return
                 if ev.get("event") == "helper.shutdown_blocked" and str(ev.get("request") or "") == request:
-                    if ev.get("reason") == "active_groups":
-                        self.exit_note = ("%s: OmaQ stays online because you are in groups; closing it could "
+                    if ev.get("reason") == "pending_messages":
+                        self.exit_note = "%s: Harbor stays online to finish sending queued messages" % COMMAND
+                    elif ev.get("reason") == "active_groups":
+                        self.exit_note = ("%s: Harbor stays online because you are in groups; closing it could "
                                           "lose a private group membership" % COMMAND)
                     else:
-                        self.exit_note = ("%s: OmaQ stays online because its group state is uncertain; closing it "
+                        self.exit_note = ("%s: Harbor stays online because its group state is uncertain; closing it "
                                           "could lose a private group membership" % COMMAND)
                     return
         self.exit_note = "%s: %s" % (COMMAND, UNCONFIRMED_EXIT)

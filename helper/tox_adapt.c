@@ -5,6 +5,7 @@
 #include "file.h"
 #include "group.h"
 #include "identity_guard.h"
+#include "harbor_transport.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -23,6 +24,7 @@
 
 struct omaq_tox {
 	Tox *tox;
+	harbor_transport *harbor;
 	ToxAV *av;
 	char home[512];
 	char recovery_state[512];
@@ -537,19 +539,62 @@ static void on_req(Tox *tox, const uint8_t *pk, const uint8_t *msg, size_t len, 
 		t->on_req(t->ud, pk, tmp);
 }
 
-static void on_msg(Tox *tox, uint32_t friend_number, Tox_Message_Type type,
-		   const uint8_t *message, size_t length, void *ud)
+static int harbor_binding(struct omaq_tox *t, int group, uint32_t target,
+                          uint32_t peer, char out[129])
 {
-	struct omaq_tox *t = ud;
-	char tmp[1400];
-	(void)tox;
-	(void)type;
-	if (length >= sizeof(tmp))
-		length = sizeof(tmp) - 1;
-	memcpy(tmp, message, length);
-	tmp[length] = '\0';
-	if (t->on_msg)
-		t->on_msg(t->ud, friend_number, tmp);
+    uint8_t key[32], chat[32];
+    if (!group) {
+        Tox_Err_Friend_Get_Public_Key err;
+        if (!tox_friend_get_public_key(t->tox, target, key, &err)) return -1;
+        hex_of(key, 32, out);
+    } else {
+        Tox_Err_Group_State_Query err;
+        if (!tox_group_get_chat_id(t->tox, target, chat, &err)) return -1;
+        hex_of(chat, 32, out);
+        if (peer != UINT32_MAX) {
+            Tox_Err_Group_Peer_Query perr;
+            if (!tox_group_peer_get_public_key(t->tox, target, peer, key, &perr)) return -1;
+            hex_of(key, 32, out + 64);
+        }
+    }
+    return 0;
+}
+
+static int harbor_packet_send(void *context, int group, uint32_t target,
+                              const char *binding, const char *text)
+{
+    struct omaq_tox *t = context;
+    char current[129];
+    if (harbor_binding(t, group, target, UINT32_MAX, current) != 0 || strcmp(current, binding))
+        return -2;
+    if (group) {
+        Tox_Err_Group_Send_Message err;
+        tox_group_send_message(t->tox, target, TOX_MESSAGE_TYPE_NORMAL,
+                               (const uint8_t *)text, strlen(text), &err);
+        return err == TOX_ERR_GROUP_SEND_MESSAGE_OK ? 0 : -1;
+    }
+    Tox_Err_Friend_Send_Message err;
+    tox_friend_send_message(t->tox, target, TOX_MESSAGE_TYPE_NORMAL,
+                            (const uint8_t *)text, strlen(text), &err);
+    return err == TOX_ERR_FRIEND_SEND_MESSAGE_OK ? 0 : -1;
+}
+
+static void on_msg(Tox *tox, uint32_t friend_number, Tox_Message_Type type,
+                   const uint8_t *message, size_t length, void *ud)
+{
+    struct omaq_tox *t = ud;
+    char tmp[1400], binding[129], *complete = NULL;
+    (void)tox; (void)type;
+    if (harbor_binding(t, 0, friend_number, UINT32_MAX, binding) != 0) return;
+    if (harbor_transport_receive(t->harbor, binding, message, length, &complete)) {
+        if (complete && t->on_msg)
+            t->on_msg(t->ud, friend_number, complete);
+        free(complete);
+        return;
+    }
+    if (length >= sizeof(tmp)) return;
+    memcpy(tmp, message, length); tmp[length] = 0;
+    if (t->on_msg) t->on_msg(t->ud, friend_number, tmp);
 }
 
 static void on_ginv(Tox *tox, uint32_t friend_number, const uint8_t *data, size_t len,
@@ -570,6 +615,14 @@ static void on_gmsg(Tox *tox, uint32_t gnum, uint32_t peer, Tox_Message_Type typ
 	(void)tox;
 	(void)type;
 	(void)mid;
+    char binding[129], *complete = NULL;
+    if (harbor_binding(t, 1, gnum, peer, binding) != 0) return;
+    if (harbor_transport_receive(t->harbor, binding, message, length, &complete)) {
+        if (complete && t->on_gmsg)
+            t->on_gmsg(t->ud, gnum, peer, (const uint8_t *)complete, strlen(complete));
+        free(complete);
+        return;
+    }
 	if (t->on_gmsg)
 		t->on_gmsg(t->ud, gnum, peer, message, length);
 }
@@ -927,6 +980,7 @@ savedata_fail:
 		free(plain);
 	}
 	tox_options_free(opt);
+	harbor_transport_free(t->harbor);
 	wipe_pass(t);
 	free(t);
 	if (err_out && *err_out == 0)
@@ -946,6 +1000,7 @@ void omaq_tox_discard(struct omaq_tox *t)
 		tox_kill(t->tox);
 		t->tox = NULL;
 	}
+	harbor_transport_free(t->harbor);
 	wipe_pass(t);
 	free(t);
 }
@@ -1010,7 +1065,9 @@ void omaq_tox_iterate(struct omaq_tox *t)
 
 	if (!t || !t->tox)
 		return;
+	if (!t->harbor) t->harbor = harbor_transport_new();
 	tox_iterate(t->tox, t);
+	harbor_transport_pump(t->harbor, harbor_packet_send, t);
 	if (t->av)
 		toxav_iterate(t->av);
 	now = time(NULL);
@@ -1244,11 +1301,21 @@ int omaq_tox_friend_accept(struct omaq_tox *t, const uint8_t *pk32)
 	return 0;
 }
 
+int omaq_tox_send_pending(const struct omaq_tox *t)
+{
+	return t && harbor_transport_pending(t->harbor);
+}
+
 int omaq_tox_send(struct omaq_tox *t, uint32_t friend_number, const char *text)
 {
 	Tox_Err_Friend_Send_Message err = TOX_ERR_FRIEND_SEND_MESSAGE_OK;
 	if (!t || !text)
 		return -1;
+    char binding[129];
+    if (!t->harbor) t->harbor = harbor_transport_new();
+    if (!t->harbor || harbor_binding(t, 0, friend_number, UINT32_MAX, binding) != 0) return -1;
+    int queued = harbor_transport_send(t->harbor, 0, friend_number, binding, text);
+    if (queued != 0) return queued > 0 ? 0 : -1;
 	tox_friend_send_message(t->tox, friend_number, TOX_MESSAGE_TYPE_NORMAL,
 				(const uint8_t *)text, strlen(text), &err);
 	if (err == TOX_ERR_FRIEND_SEND_MESSAGE_OK)
@@ -1444,6 +1511,11 @@ int omaq_tox_group_send(struct omaq_tox *t, uint32_t gnum, const char *text)
 	Tox_Err_Group_Send_Message err = TOX_ERR_GROUP_SEND_MESSAGE_OK;
 	if (!t || !t->tox || !text || !text[0])
 		return -1;
+    char binding[129];
+    if (!t->harbor) t->harbor = harbor_transport_new();
+    if (!t->harbor || harbor_binding(t, 1, gnum, UINT32_MAX, binding) != 0) return -1;
+    int queued = harbor_transport_send(t->harbor, 1, gnum, binding, text);
+    if (queued != 0) return queued > 0 ? 0 : -1;
 	tox_group_send_message(t->tox, gnum, TOX_MESSAGE_TYPE_NORMAL,
 			       (const uint8_t *)text, strlen(text), &err);
 	if (err == TOX_ERR_GROUP_SEND_MESSAGE_OK)

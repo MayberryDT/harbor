@@ -20,9 +20,9 @@ OLD_URGENT_LIMIT = 4096 * 1024
 BATCH_EVENTS = 80
 TEST_EVENT_SIZE = 65_500
 COMMAND = b'{"op":"status"}\n'
-EVENT = b'{"event":"snapshot","protocol":16,"historyClear":2,"identityExport":2,"unread":0,"conversations":[],"call":null}\n'
+EVENT = b'{"event":"snapshot","protocol":17,"historyClear":2,"identityExport":2,"unread":0,"conversations":[],"call":null}\n'
 STATUS_NONCE_COMMAND = b'{"op":"status","id":"fresh-status-1"}\n'
-STATUS_NONCE_EVENT = b'{"event":"snapshot","protocol":16,"historyClear":2,"identityExport":2,"unread":0,"conversations":[],"call":null,"request":"fresh-status-1"}\n'
+STATUS_NONCE_EVENT = b'{"event":"snapshot","protocol":17,"historyClear":2,"identityExport":2,"unread":0,"conversations":[],"call":null,"request":"fresh-status-1"}\n'
 UNSUPPORTED_EVENT = b'{"event":"error","code":"unsupported"}\n'
 FORBIDDEN_EVENT = b'{"event":"error","code":"forbidden"}\n'
 INVITE_URL = (
@@ -230,7 +230,7 @@ def main() -> int:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as framing_client:
             framing_client.settimeout(0.25)
             framing_client.connect(str(socket_path))
-            framing_client.sendall(b"x" * 4096 + COMMAND)
+            framing_client.sendall(b"x" * 400000 + COMMAND)
             framing_client.sendall(COMMAND[:-1] + b"\0garbage\n")
             try:
                 unexpected = framing_client.recv(4096)

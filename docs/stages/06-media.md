@@ -6,7 +6,7 @@
 ## Landed
 
 - `file.send` / `file.accept` / `file.cancel` over Tox `TOX_FILE_KIND_DATA`
-- Incoming transfer stays paused until `file.accept`; default dest `~/Downloads/omaq/<name>`, `0600`, cap 8 MiB. An explicit destination override remains supported.
+- Incoming transfer stays paused until `file.accept`; default dest `~/Downloads/omaq/<name>`, `0600`, cap 1 GiB. An explicit destination override remains supported.
 - `call.start` / `call.answer` / `call.stop`: direct-chat-only ToxAV signaling (48 kbit, video 0).
 - `helper/av.c` uses bounded 48 kHz mono PCM rings. Capture and playback share one interruptible `libpulse` event-loop thread, while all ToxAV calls remain on the helper iteration thread.
 - Incoming audio is downmixed from stereo when needed. Unsupported rates are dropped rather than interpreted incorrectly.
@@ -22,7 +22,7 @@
 make verify-6
 ```
 
-`tests/phase6.sh` prints the measured call-peak RSS. The gate is 40,960 kB. Its four `OmaQ-Call-Test-*` capture and playback endpoints run on a parent-death-bound private PipeWire/PulseAudio server, so they do not appear in the user's normal device registry.
+`tests/phase6.sh` prints the measured call-peak RSS. The gate is 40,960 kB. Its four `Harbor-Call-Test-*` capture and playback endpoints run on a parent-death-bound private PipeWire/PulseAudio server, so they do not appear in the user's normal device registry.
 
 Before starting the private server, the harness removes only exact `omaq_p6_<pid>_{cap,out}_{a,b}` modules whose owning PID is no longer alive. Two SIGKILL regressions verify private-server teardown and legacy orphan reclamation without removing a live run.
 

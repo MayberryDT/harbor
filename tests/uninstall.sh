@@ -24,7 +24,7 @@ if [ -n "${OMAQ_TEST_REMOVE_ENTERED:-}" ]; then
     sleep 0.025
   done
 fi
-[ "$*" = "plugin remove hancore.omaq --yes" ] || exit 2
+[ "$*" = "plugin remove io.zet.harbor --yes" ] || exit 2
 [ -f "$OMAQ_STATE/omaq.uninstalling" ] || {
   echo "uninstall-test: uninstall marker missing during removal" >&2
   exit 3
@@ -35,7 +35,7 @@ for marker in omaq.pid omaq.protocol omaq.sock; do
     exit 4
   }
 done
-printf 'Removed hancore.omaq. Backup at: %s\n' "$OMAQ_TEST_PLUGIN_BACKUP"
+printf 'Removed io.zet.harbor. Backup at: %s\n' "$OMAQ_TEST_PLUGIN_BACKUP"
 SH
 chmod 755 "$tmp/bin/omarchy"
 
@@ -49,7 +49,7 @@ run_case() {
   backup="$case_root/backup"
   umask 077
   mkdir -p "$plugin/scripts" "$plugin/helper" "$home" "$state" "$runtime" "$backup"
-  rule_dir="$runtime/omaq-hypr"
+  rule_dir="$runtime/harbor-hypr"
   rule_key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   mkdir -m 700 "$rule_dir"
   printf 'generation\n' >"$rule_dir/rules-v2.$rule_key"
@@ -144,20 +144,20 @@ run_link_case() {
   mode=$1
   expected=$2
   link_root="$tmp/link-$mode"
-  link="$link_root/user/.local/bin/omaq-connect"
+  link="$link_root/user/.local/bin/harbor-connect"
   mkdir -p "$link_root/plugin/scripts" "$link_root/plugin/helper" "$link_root/home" \
     "$link_root/runtime" "$link_root/backup" "$link_root/user/.local/bin"
   cp "$root/scripts/uninstall-omaq.sh" "$link_root/plugin/scripts/uninstall-omaq.sh"
   cp "$helper" "$link_root/plugin/helper/omaq"
   chmod 755 "$link_root/plugin/scripts/uninstall-omaq.sh" "$link_root/plugin/helper/omaq"
   case $mode in
-    dangling) ln -s "$link_root/removed/hancore.omaq/cli/omaq.py" "$link" ;;
+    dangling) ln -s "$link_root/removed/io.zet.harbor/cli/omaq.py" "$link" ;;
     present)
-      mkdir -p "$link_root/source/hancore.omaq/cli"
-      : >"$link_root/source/hancore.omaq/cli/omaq.py"
-      ln -s "$link_root/source/hancore.omaq/cli/omaq.py" "$link"
+      mkdir -p "$link_root/source/io.zet.harbor/cli"
+      : >"$link_root/source/io.zet.harbor/cli/omaq.py"
+      ln -s "$link_root/source/io.zet.harbor/cli/omaq.py" "$link"
       ;;
-    foreign) ln -s "$link_root/elsewhere/omaq-connect" "$link" ;;
+    foreign) ln -s "$link_root/elsewhere/harbor-connect" "$link" ;;
     file) printf 'not a link\n' >"$link" ;;
   esac
   HOME="$link_root/user" PATH="$tmp/bin:$PATH" OMAQ_HOME="$link_root/home" \
@@ -173,11 +173,11 @@ run_link_case() {
   if [ "$expected" = removed ]; then
     if [ -e "$link" ] || [ -L "$link" ] ||
         ! grep -Fqx "Removed: $link" "$link_root/uninstall.out"; then
-      echo "uninstall: the omaq-connect link into the removed plugin was kept" >&2
+      echo "uninstall: the harbor-connect link into the removed plugin was kept" >&2
       exit 1
     fi
   elif [ ! -e "$link" ] && [ ! -L "$link" ]; then
-    echo "uninstall: omaq-connect ($mode) was removed" >&2
+    echo "uninstall: harbor-connect ($mode) was removed" >&2
     exit 1
   fi
 }
@@ -195,7 +195,7 @@ run_rule_cleanup_refused_case() {
   state="$case_root/state"
   runtime="$case_root/runtime"
   backup="$case_root/backup"
-  rule_dir="$runtime/omaq-hypr"
+  rule_dir="$runtime/harbor-hypr"
   rule_key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   valid_rule="$rule_dir/rules-v2.$rule_key"
   umask 077
@@ -813,7 +813,7 @@ wait "$unsafe_socket_pid" 2>/dev/null || true
 
 interactive="$tmp/interactive-cleanup"
 interactive_home="$interactive/home"
-interactive_plugin="$interactive_home/.config/omarchy/plugins/hancore.omaq"
+interactive_plugin="$interactive_home/.config/omarchy/plugins/io.zet.harbor"
 interactive_state="$interactive_home/.local/state/omaq"
 interactive_archive="$interactive_home/.local/state/omaq-source-update-archive"
 interactive_data="$interactive_home/.local/share/omaq"
@@ -831,14 +831,14 @@ cp "$root/scripts/uninstall-omaq.sh" \
 cp "$helper" "$interactive_plugin/helper/omaq"
 cat >"$interactive/bin/omarchy" <<'EOF'
 #!/bin/sh
-[ "$*" = "plugin remove hancore.omaq --yes" ] || exit 2
-printf 'Removed hancore.omaq.\n'
+[ "$*" = "plugin remove io.zet.harbor --yes" ] || exit 2
+printf 'Removed io.zet.harbor.\n'
 EOF
 cat >"$interactive/bin/gum" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >>"$OMAQ_TEST_GUM_LOG"
 case "$*" in
-  *"Remove the OmaQ plugin?"*) exit 0 ;;
+  *"Remove the Harbor plugin?"*) exit 0 ;;
   *"Permanently delete $OMAQ_TEST_DELETE_PATH ("*) exit 0 ;;
   *) exit 1 ;;
 esac
@@ -888,7 +888,7 @@ grep -Fq -- '--default=false Permanently delete' "$interactive/gum.log" || {
   exit 1
 }
 tr -d '\r' <"$interactive/uninstall.out" >"$interactive/uninstall.normalized"
-grep -Fxq 'OmaQ removed. Unselected data and all packages were kept.' \
+grep -Fxq 'Harbor removed. Unselected data and all packages were kept.' \
   "$interactive/uninstall.normalized" || {
   echo "uninstall: concise completion status is missing" >&2
   exit 1
@@ -987,7 +987,7 @@ base=$1
 source_root=$2
 helper=$3
 home="$base/home"
-plugin="$home/.config/omarchy/plugins/hancore.omaq"
+plugin="$home/.config/omarchy/plugins/io.zet.harbor"
 data="$home/data"
 state="$home/state"
 runtime="$home/runtime"
@@ -1000,8 +1000,8 @@ printf 'inside selected tree\n' >"$data/value"
 printf 'outside sentinel\n' >"$source/sentinel"
 cat >"$base/bin/omarchy" <<'SH'
 #!/bin/sh
-[ "$*" = "plugin remove hancore.omaq --yes" ] || exit 2
-printf 'Removed hancore.omaq.\n'
+[ "$*" = "plugin remove io.zet.harbor --yes" ] || exit 2
+printf 'Removed io.zet.harbor.\n'
 SH
 cat >"$base/bin/gum" <<'SH'
 #!/bin/sh

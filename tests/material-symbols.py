@@ -43,7 +43,7 @@ def source_checks():
         # Existing semantic icon properties remain names, not display text.
         expressions = [m.group(1) for m in re.finditer(
             r'(?m)^\s*(?:materialIcon|iconText):\s*(.*(?:\n[ \t]+(?:\?|:|"|\().*)*)', text)]
-        expressions += re.findall(r'OmaQ\.MaterialSymbols\.glyph\((.*?)\)', text, re.S)
+        expressions += re.findall(r'Harbor\.MaterialSymbols\.glyph\((.*?)\)', text, re.S)
         for expression in expressions:
             expression = re.sub(r'===?\s*"[^"]*"', '', expression)
             names.update(re.findall(r'"([a-z][a-z_0-9]*)"', expression))
@@ -52,12 +52,12 @@ def source_checks():
     assert names <= mapping.keys(), f'unmapped icon names: {sorted(names - mapping.keys())}'
     for path, expected in (('ChatSurface.qml', ['call', 'call', 'call_end', 'call_end']),
                            ('Panel.qml', ['call'])):
-        literals = re.findall(r'OmaQ\.MaterialSymbols\.ready\s*\?\s*"\\u([0-9a-f]{4})"\s*:\s*"\?"',
+        literals = re.findall(r'Harbor\.MaterialSymbols\.ready\s*\?\s*"\\u([0-9a-f]{4})"\s*:\s*"\?"',
                               (ROOT / path).read_text())
         assert [chr(int(value, 16)) for value in literals] == [mapping[name] for name in expected]
     panel = (ROOT / 'Panel.qml').read_text()
-    for needle in ('OmaQ.MaterialSymbols.glyph(tokenButton.iconText)',
-                   'OmaQ.MaterialSymbols.glyph(railIcon.materialIcon)'):
+    for needle in ('Harbor.MaterialSymbols.glyph(tokenButton.iconText)',
+                   'Harbor.MaterialSymbols.glyph(railIcon.materialIcon)'):
         assert needle in panel
     assert (ROOT / 'SafeText.qml').read_text() == 'import QtQuick\n\nText {\n  textFormat: Text.PlainText\n}\n'
     for body in ('"x": "\\u0041"', '"x": "\\ue001",\n"x": "\\ue002"', '"x": service.value'):

@@ -45,7 +45,7 @@ print("""  Component.onCompleted: {
         return
       }
     }
-    if (root.errorText("runtime_marker_failed") !== "Your identity change is saved, but OmaQ could not update its runtime file. Free some disk space, then restart OmaQ; until then, quitting may leave it running.") {
+    if (root.errorText("runtime_marker_failed") !== "Your identity change is saved, but Harbor could not update its runtime file. Free some disk space, then restart Harbor; until then, quitting may leave it running.") {
       Qt.exit(20)
       return
     }

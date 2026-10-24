@@ -161,10 +161,10 @@ PULSE_SERVER="unix:$pulse_runtime/pulse/native"
 export PULSE_SERVER
 pactl info >/dev/null
 for sink_spec in \
-	"$cap_a:OmaQ-Call-Test-A-Capture" \
-	"$out_a:OmaQ-Call-Test-A-Output" \
-	"$cap_b:OmaQ-Call-Test-B-Capture" \
-	"$out_b:OmaQ-Call-Test-B-Output"
+	"$cap_a:Harbor-Call-Test-A-Capture" \
+	"$out_a:Harbor-Call-Test-A-Output" \
+	"$cap_b:Harbor-Call-Test-B-Capture" \
+	"$out_b:Harbor-Call-Test-B-Output"
 do
 	sink=${sink_spec%%:*}
 	description=${sink_spec#*:}

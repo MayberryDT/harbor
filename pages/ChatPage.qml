@@ -6,7 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
-import ".." as OmaQ
+import ".." as Harbor
 import "../Emoji.js" as Emoji
 import "../MessageLayout.js" as MessageLayout
 
@@ -345,7 +345,7 @@ FocusScope {
       radius: Style.cornerRadius
     }
 
-    contentItem: OmaQ.SafeText {
+    contentItem: Harbor.SafeText {
       text: omaqTooltip.text
       color: Color.tooltip.text
       font.family: root.fontFamily
@@ -413,22 +413,22 @@ FocusScope {
     contentItem: RowLayout {
       spacing: Style.space(8)
 
-      OmaQ.SafeText {
+      Harbor.SafeText {
         Layout.preferredWidth: Style.font.icon
         horizontalAlignment: Text.AlignHCenter
-        text: OmaQ.MaterialSymbols.glyph(contextItem.materialIcon)
+        text: Harbor.MaterialSymbols.glyph(contextItem.materialIcon)
         visible: contextItem.materialIcon !== ""
         color: contextItem.informational ? contextItem.informationalIconColor :
           (!contextItem.enabled ? Qt.darker(root.fg, 1.6) :
            (contextItem.highlighted ? root.accent : root.fg))
-        font.family: OmaQ.MaterialSymbols.family
+        font.family: Harbor.MaterialSymbols.family
         font.pixelSize: Style.font.icon
         font.variableAxes: ({ "FILL": contextItem.informational
           ? contextItem.informationalIconFill : 0, "wght": 500 })
         renderType: Text.QtRendering
       }
 
-      OmaQ.SafeText {
+      Harbor.SafeText {
         Layout.fillWidth: true
         text: contextItem.text
         color: contextItem.informational ? root.fg :
@@ -439,11 +439,11 @@ FocusScope {
         elide: Text.ElideRight
       }
 
-      OmaQ.SafeText {
+      Harbor.SafeText {
         visible: !!contextItem.subMenu
-        text: OmaQ.MaterialSymbols.glyph("chevron_right")
+        text: Harbor.MaterialSymbols.glyph("chevron_right")
         color: contextItem.highlighted ? root.accent : Qt.darker(root.fg, 1.35)
-        font.family: OmaQ.MaterialSymbols.family
+        font.family: Harbor.MaterialSymbols.family
         font.pixelSize: Style.font.icon
         font.variableAxes: ({ "FILL": 0, "wght": 500 })
         renderType: Text.QtRendering
@@ -470,15 +470,15 @@ FocusScope {
     Keys.onEnterPressed: reactionAction.clicked()
     Keys.onSpacePressed: reactionAction.clicked()
 
-    OmaQ.SafeText {
+    Harbor.SafeText {
       anchors.centerIn: parent
       text: reactionAction.emoji !== "" ? reactionAction.emoji
-        : OmaQ.MaterialSymbols.glyph(reactionAction.materialIcon)
+        : Harbor.MaterialSymbols.glyph(reactionAction.materialIcon)
       color: reactionAction.materialIcon !== ""
         ? (reactionAction.selected || reactionHover.hovered || reactionAction.activeFocus
           ? root.accent : root.fg)
         : root.fg
-      font.family: reactionAction.emoji !== "" ? "Noto Color Emoji" : OmaQ.MaterialSymbols.family
+      font.family: reactionAction.emoji !== "" ? "Noto Color Emoji" : Harbor.MaterialSymbols.family
       font.pixelSize: reactionAction.emoji !== ""
         ? (reactionAction.compact ? Style.font.bodySmall : Style.font.body)
         : (reactionAction.compact ? Style.font.body : Style.font.icon)
@@ -533,18 +533,18 @@ FocusScope {
     Accessible.role: Accessible.StaticText
     Accessible.name: label
 
-    OmaQ.SafeText {
+    Harbor.SafeText {
       id: receiptText
       anchors.centerIn: parent
-      text: receiptMark.failed ? OmaQ.MaterialSymbols.glyph("error") :
-        (receiptMark.uncertain ? OmaQ.MaterialSymbols.glyph("help") :
+      text: receiptMark.failed ? Harbor.MaterialSymbols.glyph("error") :
+        (receiptMark.uncertain ? Harbor.MaterialSymbols.glyph("help") :
         (receiptMark.acknowledgement >= 2 ? "✓✓" :
          (receiptMark.acknowledgement >= 1 ? "✓" : "·")))
       color: receiptMark.markColor
       opacity: receiptMark.failed || receiptMark.uncertain ||
         receiptMark.acknowledgement >= 1 ? 1.0 : 0.72
       font.family: receiptMark.failed || receiptMark.uncertain
-        ? OmaQ.MaterialSymbols.family : root.fontFamily
+        ? Harbor.MaterialSymbols.family : root.fontFamily
       font.pixelSize: receiptMark.failed || receiptMark.uncertain
         ? Style.font.body : Style.font.caption
       font.variableAxes: receiptMark.failed || receiptMark.uncertain
@@ -573,11 +573,11 @@ FocusScope {
     implicitWidth: Style.space(30)
     implicitHeight: Style.space(30)
 
-    OmaQ.SafeText {
+    Harbor.SafeText {
       anchors.centerIn: parent
-      text: OmaQ.MaterialSymbols.glyph(formatButton.materialIcon)
+      text: Harbor.MaterialSymbols.glyph(formatButton.materialIcon)
       color: formatButton.hot || formatButton.selected ? formatButton.accent : formatButton.foreground
-      font.family: OmaQ.MaterialSymbols.family
+      font.family: Harbor.MaterialSymbols.family
       font.pixelSize: formatButton.materialIconSize
       font.variableAxes: ({ "FILL": 0, "wght": 500 })
       renderType: Text.QtRendering
@@ -610,7 +610,7 @@ FocusScope {
       cache: true
     }
 
-    OmaQ.SafeText {
+    Harbor.SafeText {
       anchors.fill: parent
       visible: emojiPickerImage.status === Image.Error ||
         emojiPickerImage.status === Image.Null
@@ -1031,7 +1031,7 @@ FocusScope {
     if (!root.directBindingValid)
       return
     if (!root.service.supportsCorrelatedHistoryClear) {
-      root.reactionStatus = "Restart the OmaQ helper before clearing this chat"
+      root.reactionStatus = "Restart the Harbor helper before clearing this chat"
       reactionStatusTimer.interval = 6000
       reactionStatusTimer.restart()
       return
@@ -1918,6 +1918,8 @@ FocusScope {
 
   function messageFailureText(code) {
     var failure = String(code || "error")
+    if (failure === "message_too_large")
+      return "Messages can be at most 64 KiB"
     if (failure === "offline")
       return "Contact is offline"
     if (failure === "ratchet_pending")
@@ -2004,8 +2006,8 @@ FocusScope {
     if (!root.service.sendFile(path, root.conversation, "image", root.peerKey)) {
       var code = String(root.service.lastError || "helper_unavailable")
       root.fileStatus = code === "busy" ? "A file is already sending"
-        : code === "helper_update_required" ? "Restart the OmaQ helper before sending group images"
-        : code === "helper_handshake_pending" ? "Wait for OmaQ to reconnect, then send again"
+        : code === "helper_update_required" ? "Restart the Harbor helper before sending group images"
+        : code === "helper_handshake_pending" ? "Wait for Harbor to reconnect, then send again"
         : code === "identity_changed" ? "The conversation identity changed"
         : "Image could not be sent"
       root.fileStatusPath = path
@@ -2031,6 +2033,12 @@ FocusScope {
       return
     if (!root.demo && (!service || !root.directBindingValid))
       return
+    if (service && service.messageTextFits && !service.messageTextFits(t)) {
+      root.fileStatus = "Messages can be at most 64 KiB"
+      fileStatusTimer.interval = 5000
+      fileStatusTimer.restart()
+      return
+    }
     root.stopTyping()
     root.followLatest = true
     if (root.editingId) {
@@ -2114,7 +2122,7 @@ FocusScope {
     }
     if (service && service.answerCall(root.conversation, root.peerKey)) {
       root.clearCallFeedback()
-      OmaQ.CallTone.stopAll()
+      Harbor.CallTone.stopAll()
     } else {
       root.showCallFeedback("Call control unavailable")
     }
@@ -2133,7 +2141,7 @@ FocusScope {
     }
     if (service && service.stopCall(root.conversation, root.peerKey)) {
       root.clearCallFeedback()
-      OmaQ.CallTone.stopAll()
+      Harbor.CallTone.stopAll()
     } else {
       root.showCallFeedback("Call control unavailable")
     }
@@ -2141,7 +2149,7 @@ FocusScope {
 
   function attachFile() {
     if (root.groupConversation && !root.attachmentsAvailable) {
-      root.fileStatus = "Restart the OmaQ helper before sending group files"
+      root.fileStatus = "Restart the Harbor helper before sending group files"
       fileStatusTimer.interval = 5000
       fileStatusTimer.restart()
       return
@@ -2331,21 +2339,21 @@ FocusScope {
       return
     }
     if (!root.service) {
-      root.fileStatus = "OmaQ is unavailable — reconnect before pasting an image"
+      root.fileStatus = "Harbor is unavailable — reconnect before pasting an image"
       root.fileStatusPath = ""
       return
     }
     if (root.groupConversation && !root.attachmentsAvailable) {
       root.fileStatus = root.service.awaitingHelperInstance ||
         root.service.helperCompatibility !== "compatible"
-        ? "Wait for OmaQ to reconnect before pasting a group image"
-        : "Restart the OmaQ helper before pasting group images"
+        ? "Wait for Harbor to reconnect before pasting a group image"
+        : "Restart the Harbor helper before pasting group images"
       root.fileStatusPath = ""
       return
     }
     if (root.service.awaitingHelperInstance ||
         root.service.helperCompatibility !== "compatible") {
-      root.fileStatus = "Wait for OmaQ to reconnect before pasting an image"
+      root.fileStatus = "Wait for Harbor to reconnect before pasting an image"
       root.fileStatusPath = ""
       return
     }
@@ -2408,7 +2416,7 @@ FocusScope {
       return
     }
     if (root.groupConversation && !root.attachmentsAvailable) {
-      root.fileStatus = "Restart the OmaQ helper before sending group files"
+      root.fileStatus = "Restart the Harbor helper before sending group files"
       return
     }
     if (path.charAt(0) !== "/" || path.length >= 512 || path.indexOf("..") !== -1) {
@@ -2416,7 +2424,7 @@ FocusScope {
       return
     }
     if (service.helperCompatibility === "incompatible") {
-      root.fileStatus = "Restart the OmaQ helper before sending files"
+      root.fileStatus = "Restart the Harbor helper before sending files"
       fileStatusTimer.interval = 5000
       fileStatusTimer.restart()
       return
@@ -2914,7 +2922,7 @@ FocusScope {
         root.attachmentInspectionRequest = ""
         root.attachmentInspectionPath = ""
         attachmentInspectionTimer.stop()
-        root.fileStatus = "Image preparation stopped because OmaQ restarted"
+        root.fileStatus = "Image preparation stopped because Harbor restarted"
         root.fileStatusPath = ""
       }
       if (root.pendingImageSendRequest !== "" && root.service &&
@@ -3193,7 +3201,7 @@ FocusScope {
       border.width: 1
       radius: Style.cornerRadius
 
-      OmaQ.SafeText {
+      Harbor.SafeText {
         anchors.centerIn: parent
         text: "Drop image or file"
         color: root.accent
@@ -3270,12 +3278,12 @@ FocusScope {
               root.peerAvatarFailed = true
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             anchors.centerIn: parent
             visible: root.peerAvatar === "" || root.peerAvatarFailed
-            text: OmaQ.MaterialSymbols.glyph(root.groupConversation ? "group" : "person")
+            text: Harbor.MaterialSymbols.glyph(root.groupConversation ? "group" : "person")
             color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.72)
-            font.family: OmaQ.MaterialSymbols.family
+            font.family: Harbor.MaterialSymbols.family
             font.pixelSize: Math.round(Style.font.display * 0.64)
             font.variableAxes: ({ "FILL": 0, "wght": 500 })
             renderType: Text.QtRendering
@@ -3356,7 +3364,7 @@ FocusScope {
           }
         }
 
-        OmaQ.SafeText {
+        Harbor.SafeText {
           visible: root.clearConfirm
           text: "Clear this chat?"
           color: root.accent
@@ -3431,7 +3439,7 @@ FocusScope {
           }
         }
 
-        OmaQ.SafeText {
+        Harbor.SafeText {
           visible: root.searchPending || root.searchCompleted ||
             root.searchFeedback !== ""
           Layout.fillWidth: true
@@ -3475,7 +3483,7 @@ FocusScope {
               anchors.rightMargin: Style.space(6)
               spacing: Style.space(1)
 
-              OmaQ.SafeText {
+              Harbor.SafeText {
                 width: parent.width
                 text: root.searchMetaText(chatSearchResult.modelData)
                 color: root.accent
@@ -3484,7 +3492,7 @@ FocusScope {
                 elide: Text.ElideRight
               }
 
-              OmaQ.SafeText {
+              Harbor.SafeText {
                 width: parent.width
                 text: String(chatSearchResult.modelData &&
                   chatSearchResult.modelData.text || "")
@@ -3508,7 +3516,7 @@ FocusScope {
         Layout.preferredHeight: visible ? implicitHeight : 0
         spacing: Style.space(3)
 
-        OmaQ.SafeText {
+        Harbor.SafeText {
           id: groupInviteFeedbackText
           width: parent.width
           text: root.groupInviteFeedback !== "" ? root.groupInviteFeedback :
@@ -3568,16 +3576,16 @@ FocusScope {
                   id: inviteFriendContent
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(4)
-                  OmaQ.SafeText {
+                  Harbor.SafeText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: OmaQ.MaterialSymbols.glyph("person_add")
+                    text: Harbor.MaterialSymbols.glyph("person_add")
                     color: String(inviteFriend.modelData && inviteFriend.modelData.id || "") ===
                       root.groupInviteFriendId ? root.accent : root.fg
-                    font.family: OmaQ.MaterialSymbols.family
+                    font.family: Harbor.MaterialSymbols.family
                     font.pixelSize: Style.font.iconSmall
                     font.variableAxes: ({ "FILL": 0, "wght": 500 })
                   }
-                  OmaQ.SafeText {
+                  Harbor.SafeText {
                     id: inviteFriendName
                     anchors.verticalCenter: parent.verticalCenter
                     text: String(inviteFriend.modelData && inviteFriend.modelData.name ||
@@ -3668,7 +3676,7 @@ FocusScope {
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(4)
 
-                  OmaQ.SafeText {
+                  Harbor.SafeText {
                     visible: memberButton.index > 0
                     anchors.verticalCenter: parent.verticalCenter
                     text: "·"
@@ -3687,20 +3695,20 @@ FocusScope {
                       : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.36)
                   }
 
-                  OmaQ.SafeText {
+                  Harbor.SafeText {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: OmaQ.MaterialSymbols.glyph(memberButton.modelData.role === "owner" ? "crown" :
+                    text: Harbor.MaterialSymbols.glyph(memberButton.modelData.role === "owner" ? "crown" :
                       (memberButton.modelData.role === "admin" ? "shield_person" : "person"))
                     color: memberButton.modelData.self || memberButton.modelData.online
                       ? root.accent : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.58)
-                    font.family: OmaQ.MaterialSymbols.family
+                    font.family: Harbor.MaterialSymbols.family
                     font.pixelSize: Style.font.icon + Style.space(2)
                     font.variableAxes: ({ "FILL": 0, "wght": 600 })
                     renderType: Text.QtRendering
                     font.hintingPreference: Font.PreferNoHinting
                   }
 
-                  OmaQ.SafeText {
+                  Harbor.SafeText {
                     anchors.verticalCenter: parent.verticalCenter
                     text: memberButton.modelData.self ? "You"
                       : String(memberButton.modelData.name || "Member")
@@ -3778,7 +3786,7 @@ FocusScope {
           cancelGroupAction.implicitHeight) : 0
         spacing: Style.space(4)
 
-        OmaQ.SafeText {
+        Harbor.SafeText {
           id: groupActionText
           width: parent.width - cancelGroupAction.width - confirmGroupAction.width - parent.spacing * 2
           text: root.groupActionConfirm === "remove"
@@ -3812,7 +3820,7 @@ FocusScope {
           cancelGroupLeave.implicitHeight) : 0
         spacing: Style.space(4)
 
-        OmaQ.SafeText {
+        Harbor.SafeText {
           id: groupLeaveText
           width: parent.width - cancelGroupLeave.width - confirmGroupLeaveButton.width -
             parent.spacing * 2
@@ -3942,7 +3950,7 @@ FocusScope {
             }
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             visible: !root.demo && root.fileForThis && service && service.fileNameFor(root.conversation) !== ""
             width: parent.width
             text: service ? service.fileNameFor(root.conversation) : ""
@@ -3971,7 +3979,7 @@ FocusScope {
               border.width: filePathLink.activeFocus ? 1 : 0
             }
 
-            OmaQ.SafeText {
+            Harbor.SafeText {
               id: filePathText
               anchors.left: parent.left
               anchors.right: parent.right
@@ -4216,7 +4224,7 @@ FocusScope {
             border.width: line.failed || line.uncertain || line.keyboardSelected ? 1 : 0
             visible: model.dir !== "sys" && !model.newMarker
 
-            OmaQ.SafeText {
+            Harbor.SafeText {
               id: groupSenderLabel
               visible: line.showGroupSender
               anchors.left: parent.left
@@ -4284,12 +4292,12 @@ FocusScope {
                 onClicked: root.toggleAudio(line.contextText)
               }
 
-              OmaQ.SafeText {
+              Harbor.SafeText {
                 id: genericFileIcon
                 visible: !line.audioMessage
-                text: OmaQ.MaterialSymbols.glyph("draft")
+                text: Harbor.MaterialSymbols.glyph("draft")
                 color: root.accent
-                font.family: OmaQ.MaterialSymbols.family
+                font.family: Harbor.MaterialSymbols.family
                 font.pixelSize: Style.font.icon
                 font.variableAxes: ({ "FILL": 0, "wght": 500 })
                 renderType: Text.QtRendering
@@ -4303,7 +4311,7 @@ FocusScope {
                 Layout.maximumWidth: fileMessageRow.width
                 implicitHeight: fileMessageText.implicitHeight
 
-                OmaQ.SafeText {
+                Harbor.SafeText {
                   id: fileMessageText
                   anchors.fill: parent
                   text: root.fileDisplayName(line.contextText)
@@ -4367,13 +4375,13 @@ FocusScope {
                 cache: false
               }
 
-              OmaQ.SafeText {
+              Harbor.SafeText {
                 anchors.centerIn: parent
                 visible: inlineImageContent.status === Image.Error ||
                   inlineImageContent.status === Image.Null
-                text: OmaQ.MaterialSymbols.glyph("broken_image")
+                text: Harbor.MaterialSymbols.glyph("broken_image")
                 color: root.accent
-                font.family: OmaQ.MaterialSymbols.family
+                font.family: Harbor.MaterialSymbols.family
                 font.pixelSize: Style.font.icon
               }
 
@@ -4602,7 +4610,7 @@ FocusScope {
                     cache: true
                   }
 
-                  OmaQ.SafeText {
+                  Harbor.SafeText {
                     anchors.fill: parent
                     visible: smileImage.status === Image.Error || smileImage.status === Image.Null
                     text: smileDelegate.glyph
@@ -4618,7 +4626,7 @@ FocusScope {
             }
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             id: messageTimestamp
             objectName: "messageTimestamp"
             visible: line.timestampText !== "" && model.dir !== "sys" && !model.newMarker
@@ -4634,7 +4642,7 @@ FocusScope {
             z: 4
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             id: groupReceiptStatus
             objectName: "groupReceiptStatus"
             visible: line.hasGroupReceipt && model.dir !== "sys" && !model.newMarker
@@ -4652,7 +4660,7 @@ FocusScope {
             z: 4
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             id: metadataSeparator
             objectName: "metadataSeparator"
             visible: groupReceiptStatus.visible && messageTimestamp.visible &&
@@ -4694,7 +4702,7 @@ FocusScope {
                   return value !== "" && values.indexOf(value) === index
                 })
 
-                OmaQ.SafeText {
+                Harbor.SafeText {
                   required property int index
                   text: String(reactionBadgeRepeater.model[index] || "")
                   color: root.fg
@@ -4916,7 +4924,7 @@ FocusScope {
               color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.55)
             }
 
-            OmaQ.SafeText {
+            Harbor.SafeText {
               text: "New messages"
               color: root.accent
               font.family: root.fontFamily
@@ -4932,7 +4940,7 @@ FocusScope {
             }
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             id: sysLine
             visible: model.dir === "sys" && !model.newMarker
             width: parent.width
@@ -4956,7 +4964,7 @@ FocusScope {
           Layout.fillWidth: true
           spacing: Style.space(4)
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             Layout.fillWidth: true
             text: "File transfer"
             color: root.fg
@@ -5022,7 +5030,7 @@ FocusScope {
           Layout.fillWidth: true
           spacing: Style.space(2)
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             Layout.fillWidth: true
             text: root.reactionStatus !== "" ? root.reactionStatus : root.fileStatus
             color: root.fileStatus === "Sending…" && root.reactionStatus === ""
@@ -5032,7 +5040,7 @@ FocusScope {
             wrapMode: Text.Wrap
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             id: statusPathText
             visible: root.reactionStatus === "" && root.fileStatusPath !== ""
             Layout.fillWidth: true
@@ -5093,7 +5101,7 @@ FocusScope {
           spacing: Style.space(6)
           height: visible ? Math.max(replyPreview.implicitHeight, clearReplyBtn.implicitHeight) : 0
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             id: replyPreview
             width: parent.width - clearReplyBtn.implicitWidth - confirmDeleteBtn.width - parent.spacing * 2
             text: root.deleteConfirmId !== "" ? "Delete this message?" :
@@ -5162,7 +5170,7 @@ FocusScope {
             HoverHandler { cursorShape: Qt.PointingHandCursor }
           }
 
-          OmaQ.SafeText {
+          Harbor.SafeText {
             anchors.left: pendingImage.right
             anchors.right: sendPendingImageButton.left
             anchors.leftMargin: Style.space(6)

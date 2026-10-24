@@ -1,5 +1,5 @@
 name: Install, update, or uninstall problem
-description: Report a problem with OmaQ's supported lifecycle commands
+description: Report a problem with Harbor's supported lifecycle commands
 title: "[Lifecycle] "
 body:
   - type: markdown
@@ -21,7 +21,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: OmaQ version or commit
+      label: Harbor version or commit
       placeholder: "0.9.0-beta.2 or commit SHA"
     validations:
       required: true
@@ -72,7 +72,7 @@ body:
     attributes:
       label: Submission checks
       options:
-        - label: I used the supported OmaQ command documented for this operation.
+        - label: I used the supported Harbor command documented for this operation.
           required: true
         - label: I searched existing issues for this problem.
           required: true

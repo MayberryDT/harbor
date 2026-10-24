@@ -16,7 +16,7 @@ protocol = (root / "docs/stages/protocol-16.md").read_text(encoding="utf-8")
 security = (root / "docs/SECURITY.md").read_text(encoding="utf-8")
 
 for marker in (
-    "#define OMAQ_PROTOCOL_VERSION 16",
+    "#define OMAQ_PROTOCOL_VERSION 17",
     "static int emit_pending_direct_request(void)",
     "omaq_direct_request_event(event, sizeof(event), self, key)",
     "omaq_direct_request_conflict_event(event, sizeof(event), key)",

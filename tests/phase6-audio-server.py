@@ -112,7 +112,7 @@ def private_config(owner: int) -> bytes:
     { factory = spa-node-factory
         args = {
             factory.name = support.node.driver
-            node.name = OmaQ-Test-Dummy-Driver
+            node.name = Harbor-Test-Dummy-Driver
             node.group = pipewire.omaq-test
             priority.driver = 20000
         }
@@ -120,7 +120,7 @@ def private_config(owner: int) -> bytes:
     { factory = spa-node-factory
         args = {
             factory.name = support.node.driver
-            node.name = OmaQ-Test-Freewheel-Driver
+            node.name = Harbor-Test-Freewheel-Driver
             priority.driver = 19000
             node.group = pipewire.omaq-test-freewheel
             node.freewheel = true
@@ -136,7 +136,7 @@ def private_config(owner: int) -> bytes:
         fail("PipeWire minimal config has an unexpected PulseAudio address")
     pulse_config = (
         '    server.address = [\n        "unix:native"\n    ]\n'
-        f'    server.dbus-name = "org.pulseaudio.Server.OmaQTest{owner}"\n'
+        f'    server.dbus-name = "org.pulseaudio.Server.HarborTest{owner}"\n'
         "}"
     )
     return source.replace(pulse_marker, pulse_config, 1).encode("utf-8")

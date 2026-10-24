@@ -1,4 +1,4 @@
-module OmaQ
+module Harbor
 Panel 1.0 Panel.qml
 ChatSurface 1.0 ChatSurface.qml
 PlacementController 1.0 PlacementController.qml

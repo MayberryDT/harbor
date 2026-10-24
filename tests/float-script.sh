@@ -11,7 +11,7 @@ grep -Fq 'bash_path + b" (deleted)"' "$root/scripts/float-omaq.sh" || {
   echo "float-script: deleted Bash upgrade identity is not retained" >&2
   exit 1
 }
-tmp=$(mktemp -d /tmp/omaq-float-test-XXXXXX)
+tmp=$(mktemp -d /tmp/harbor-float-test-XXXXXX)
 socket_pid=""
 first_watcher=""
 second_watcher=""
@@ -52,7 +52,7 @@ if [ "$1" = "-j" ] && [ "${2:-}" = "clients" ]; then
     printf '%s\n' '[]'
   else
     alice_workspace="${OMAQ_FLOAT_ALICE_WORKSPACE:-7}"
-    bob_title='OmaQ chat — Bob · 1'
+    bob_title='Harbor chat — Bob · 1'
     bob_at='512,144'
     bob_size='460,520'
     if [ "${OMAQ_FLOAT_TITLE_DELAY:-0}" = "1" ] &&
@@ -60,7 +60,7 @@ if [ "$1" = "-j" ] && [ "${2:-}" = "clients" ]; then
       title_count=$(cat "$OMAQ_FLOAT_TITLE_QUERIES" 2>/dev/null || printf '0')
       title_count=$((title_count + 1))
       printf '%s\n' "$title_count" >"$OMAQ_FLOAT_TITLE_QUERIES"
-      [ "$title_count" -ge "${OMAQ_FLOAT_TITLE_READY_AFTER:-3}" ] || bob_title='OmaQ chat'
+      [ "$title_count" -ge "${OMAQ_FLOAT_TITLE_READY_AFTER:-3}" ] || bob_title='Harbor chat'
     fi
     if [ -n "${OMAQ_FLOAT_DISPATCHED:-}" ] && [ -e "$OMAQ_FLOAT_DISPATCHED" ]; then
       count=$(cat "$OMAQ_FLOAT_OBSERVATIONS" 2>/dev/null || printf '0')
@@ -72,7 +72,7 @@ if [ "$1" = "-j" ] && [ "${2:-}" = "clients" ]; then
         bob_size='700,650'
       fi
     fi
-    printf '[{"title":"OmaQ chat — Alice · 0","address":"0xabc","floating":true,"monitor":1,"workspace":{"id":%s,"name":"%s"},"at":[40,80],"size":[420,420]},{"title":"%s","address":"0xdef","floating":true,"monitor":2,"workspace":{"id":4,"name":"4"},"at":[%s],"size":[%s]}]\n' "$alice_workspace" "$alice_workspace" "$bob_title" "$bob_at" "$bob_size"
+    printf '[{"title":"Harbor chat — Alice · 0","address":"0xabc","floating":true,"monitor":1,"workspace":{"id":%s,"name":"%s"},"at":[40,80],"size":[420,420]},{"title":"%s","address":"0xdef","floating":true,"monitor":2,"workspace":{"id":4,"name":"4"},"at":[%s],"size":[%s]}]\n' "$alice_workspace" "$alice_workspace" "$bob_title" "$bob_at" "$bob_size"
   fi
 elif [ "$1" = "-j" ] && [ "${2:-}" = "monitors" ]; then
   printf '%s\n' '[{"id":1,"name":"DP-1"},{"id":2,"name":"HDMI-A-1"}]'
@@ -154,18 +154,18 @@ export HYPRLAND_INSTANCE_SIGNATURE="test-instance"
   echo "float-script: instance-scoped rule marker failed" >&2
   exit 1
 }
-grep -q '^keyword windowrulev2 = unset, title:\^(OmaQ chat\.\*)\$$' \
+grep -q '^keyword windowrulev2 = unset, title:\^(Harbor chat\.\*)\$$' \
   "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: previous classic chat rules were not cleared" >&2
   exit 1
 }
-if grep -q '^keyword windowrulev2 = noanim, title:\^(OmaQ chat' \
+if grep -q '^keyword windowrulev2 = noanim, title:\^(Harbor chat' \
     "$OMAQ_FLOAT_TEST_LOG"; then
   echo "float-script: classic chat animation remains disabled" >&2
   exit 1
 fi
 : >"$OMAQ_FLOAT_TEST_LOG"
-"$root/scripts/float-omaq.sh" focus-title "OmaQ chat — Alice · 0"
+"$root/scripts/float-omaq.sh" focus-title "Harbor chat — Alice · 0"
 if grep -q '^dispatch movetoworkspace ' "$OMAQ_FLOAT_TEST_LOG"; then
   echo "float-script: same-workspace focus changed geometry" >&2
   exit 1
@@ -175,7 +175,7 @@ grep -q '^dispatch focuswindow address:0xabc$' "$OMAQ_FLOAT_TEST_LOG" || {
   exit 1
 }
 export OMAQ_FLOAT_ALICE_WORKSPACE=6
-"$root/scripts/float-omaq.sh" focus-title "OmaQ chat — Alice · 0"
+"$root/scripts/float-omaq.sh" focus-title "Harbor chat — Alice · 0"
 unset OMAQ_FLOAT_ALICE_WORKSPACE
 grep -q '^dispatch movetoworkspace current,address:0xabc$' "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: cross-workspace move missing" >&2
@@ -188,9 +188,9 @@ export OMAQ_FLOAT_TITLE_QUERIES="$tmp/title-queries"
 export OMAQ_FLOAT_TITLE_READY_AFTER=18
 export OMAQ_FLOAT_GEOMETRY_READY_AFTER=38
 placement=$("$root/scripts/float-omaq.sh" place-title \
-  "OmaQ chat — Bob · 1" 900 400 700 650)
+  "Harbor chat — Bob · 1" 900 400 700 650)
 printf '%s' "$placement" | jq -e '
-  .title == "OmaQ chat — Bob · 1" and .monitor == "HDMI-A-1" and
+  .title == "Harbor chat — Bob · 1" and .monitor == "HDMI-A-1" and
   .x == 900 and .y == 400 and .width == 700 and .height == 650 and
   .floating == true' >/dev/null || {
   echo "float-script: delayed stable placement observation missing" >&2
@@ -211,7 +211,7 @@ if grep -E 'windowpixel .*address:0xabc' "$OMAQ_FLOAT_TEST_LOG"; then
   exit 1
 fi
 : >"$OMAQ_FLOAT_TEST_LOG"
-observed=$("$root/scripts/float-omaq.sh" observe-title "OmaQ chat — Bob · 1")
+observed=$("$root/scripts/float-omaq.sh" observe-title "Harbor chat — Bob · 1")
 if grep -Eq '^(eval|keyword|dispatch) ' "$OMAQ_FLOAT_TEST_LOG"; then
   echo "float-script: read-only observation mutated compositor state" >&2
   exit 1
@@ -224,10 +224,10 @@ printf '%s' "$observed" | jq -e '
 }
 geometry=$("$root/scripts/float-omaq.sh" list-geometry)
 printf '%s' "$geometry" | jq -e '
-  length == 2 and .[0].title == "OmaQ chat — Alice · 0" and
+  length == 2 and .[0].title == "Harbor chat — Alice · 0" and
   .[0].x == 40 and .[0].width == 420 and .[0].monitor == "DP-1" and
   .[0].floating == true and
-  .[1].title == "OmaQ chat — Bob · 1" and .[1].y == 400 and
+  .[1].title == "Harbor chat — Bob · 1" and .[1].y == 400 and
   .[1].height == 650 and .[1].monitor == "HDMI-A-1" and
   .[1].floating == true' >/dev/null || {
   echo "float-script: bounded geometry snapshot missing" >&2
@@ -239,7 +239,7 @@ rm -f "$OMAQ_FLOAT_DISPATCHED" "$OMAQ_FLOAT_OBSERVATIONS"
 export OMAQ_FLOAT_STAY_OLD=1
 set +e
 timeout_output=$("$root/scripts/float-omaq.sh" place-title \
-  "OmaQ chat — Bob · 1" 900 400 700 650)
+  "Harbor chat — Bob · 1" 900 400 700 650)
 timeout_status=$?
 set -e
 unset OMAQ_FLOAT_STAY_OLD
@@ -357,7 +357,7 @@ first_watcher=""
 second_watcher=""
 unset OMAQ_FLOAT_WATCH_BLOCK
 : >"$OMAQ_FLOAT_TEST_LOG"
-rm -rf "$XDG_RUNTIME_DIR/omaq-hypr"
+rm -rf "$XDG_RUNTIME_DIR/harbor-hypr"
 export OMAQ_FLOAT_WATCH_HOLD=1
 export OMAQ_FLOAT_NO_CLIENTS=1
 "$root/scripts/float-omaq.sh" watch-rules &
@@ -376,7 +376,7 @@ first_watcher=""
 second_watcher=""
 unset OMAQ_FLOAT_WATCH_HOLD
 unset OMAQ_FLOAT_NO_CLIENTS
-rm -rf "$XDG_RUNTIME_DIR/omaq-hypr"
+rm -rf "$XDG_RUNTIME_DIR/harbor-hypr"
 export OMAQ_FLOAT_FAIL_MARKER="$tmp/fail-once"
 set +e
 "$root/scripts/float-omaq.sh" watch-rules
@@ -402,28 +402,28 @@ socket_pid=""
 
 export OMAQ_FLOAT_LUA=1
 : >"$OMAQ_FLOAT_TEST_LOG"
-"$root/scripts/float-omaq.sh" focus-title "OmaQ chat — Alice · 0"
+"$root/scripts/float-omaq.sh" focus-title "Harbor chat — Alice · 0"
 if grep -q 'dispatch hl.dsp$' "$OMAQ_FLOAT_TEST_LOG"; then
   echo "float-script: invalid Lua capability probe returned" >&2
   exit 1
 fi
-grep -q 'omaq_window_rules.chat_v6 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG" || {
+grep -q 'harbor_window_rules.chat_v6 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: Lua rule handle is not retained" >&2
   exit 1
 }
-grep -q 'omaq_window_rules.chat_v5:set_enabled(false)' "$OMAQ_FLOAT_TEST_LOG" || {
+grep -q 'harbor_window_rules.chat_v5:set_enabled(false)' "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: previous Lua no-animation rule remains enabled" >&2
   exit 1
 }
-grep -Fq 'match = { initial_title = "^OmaQ chat.*$" }' "$OMAQ_FLOAT_TEST_LOG" || {
+grep -Fq 'match = { initial_title = "^Harbor chat.*$" }' "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: static Lua rule does not match the initial title" >&2
   exit 1
 }
-grep -q 'omaq_window_rules.demo_v4.*no_anim = true' "$OMAQ_FLOAT_TEST_LOG" || {
+grep -q 'harbor_window_rules.demo_v4.*no_anim = true' "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: demo window animation unexpectedly changed" >&2
   exit 1
 }
-chat_rule=$(grep 'omaq_window_rules.chat_v6 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG")
+chat_rule=$(grep 'harbor_window_rules.chat_v6 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG")
 if printf '%s\n' "$chat_rule" | grep -q 'no_anim'; then
   echo "float-script: Lua chat animation remains disabled" >&2
   exit 1
@@ -442,7 +442,7 @@ if grep -Eq 'window\.float|setfloating|fullscreenstate' "$OMAQ_FLOAT_TEST_LOG"; 
   exit 1
 fi
 export OMAQ_FLOAT_ALICE_WORKSPACE=6
-"$root/scripts/float-omaq.sh" focus-title "OmaQ chat — Alice · 0"
+"$root/scripts/float-omaq.sh" focus-title "Harbor chat — Alice · 0"
 unset OMAQ_FLOAT_ALICE_WORKSPACE
 grep -q 'hl.dsp.window.move({ workspace = "7", window = "address:0xabc", follow = true })' \
   "$OMAQ_FLOAT_TEST_LOG" || {
@@ -452,7 +452,7 @@ grep -q 'hl.dsp.window.move({ workspace = "7", window = "address:0xabc", follow 
 export OMAQ_FLOAT_DISPATCHED="$tmp/lua-dispatched"
 export OMAQ_FLOAT_OBSERVATIONS="$tmp/lua-observations"
 lua_placement=$("$root/scripts/float-omaq.sh" place-title \
-  "OmaQ chat — Bob · 1" 900 400 700 650)
+  "Harbor chat — Bob · 1" 900 400 700 650)
 printf '%s' "$lua_placement" | jq -e '
   .x == 900 and .y == 400 and .width == 700 and .height == 650 and
   .floating == true' >/dev/null || {
@@ -469,7 +469,7 @@ printf '%s' "$lua_placement" | jq -e '
 }
 unset OMAQ_FLOAT_DISPATCHED OMAQ_FLOAT_OBSERVATIONS
 export OMAQ_FLOAT_SPECIAL=1
-"$root/scripts/float-omaq.sh" focus-title "OmaQ chat — Alice · 0"
+"$root/scripts/float-omaq.sh" focus-title "Harbor chat — Alice · 0"
 grep -q 'hl.dsp.window.move({ workspace = "special:scratchpad", window = "address:0xabc", follow = true })' \
   "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: Lua special-workspace move missing" >&2

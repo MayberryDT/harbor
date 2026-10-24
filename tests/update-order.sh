@@ -21,7 +21,7 @@ extract_block() {
 }
 
 extract_block "## Install" "$root/README.md" >"$tmp/readme-install.sh"
-extract_block "## Install OmaQ" "$root/docs/INSTALLATION.md" >"$tmp/installation-install.sh"
+extract_block "## Install Harbor" "$root/docs/INSTALLATION.md" >"$tmp/installation-install.sh"
 [ -s "$tmp/readme-install.sh" ] || {
   echo "update-order: README install command is missing" >&2
   exit 1
@@ -32,8 +32,8 @@ cmp -s "$tmp/readme-install.sh" "$tmp/installation-install.sh" || {
 }
 # shellcheck disable=SC2088
 printf '%s\n' \
-  'omarchy plugin add https://github.com/HANCORE-linux/OmaQ.git --yes &&' \
-  '~/.config/omarchy/plugins/hancore.omaq/install.sh --yes' \
+  'omarchy plugin add https://github.com/MayberryDT/harbor.git --yes &&' \
+  '~/.config/omarchy/plugins/io.zet.harbor/install.sh --yes' \
   >"$tmp/install.expected"
 cmp -s "$tmp/readme-install.sh" "$tmp/install.expected" || {
   echo "update-order: primary install is not the normal two-step Omarchy command" >&2
@@ -41,7 +41,7 @@ cmp -s "$tmp/readme-install.sh" "$tmp/install.expected" || {
 }
 
 extract_block "## Update" "$root/README.md" >"$tmp/readme-update.sh"
-extract_block "## Update OmaQ" "$root/docs/INSTALLATION.md" >"$tmp/installation-update.sh"
+extract_block "## Update Harbor" "$root/docs/INSTALLATION.md" >"$tmp/installation-update.sh"
 [ -s "$tmp/readme-update.sh" ] || {
   echo "update-order: README update command is missing" >&2
   exit 1
@@ -61,13 +61,13 @@ mkdir -p "$tmp/bin" "$tmp/home/.config/omarchy/plugins"
 cat >"$tmp/bin/omarchy" <<'EOF'
 #!/bin/sh
 set -eu
-[ "$*" = "plugin add https://github.com/HANCORE-linux/OmaQ.git --yes" ] || {
+[ "$*" = "plugin add https://github.com/MayberryDT/harbor.git --yes" ] || {
   printf 'unexpected omarchy command: %s\n' "$*" >&2
   exit 99
 }
 printf 'plugin-add\n' >>"$OMAQ_INSTALL_TEST_LOG"
 [ "${OMAQ_PLUGIN_STATUS:-0}" -eq 0 ] || exit "$OMAQ_PLUGIN_STATUS"
-target="$HOME/.config/omarchy/plugins/hancore.omaq"
+target="$HOME/.config/omarchy/plugins/io.zet.harbor"
 mkdir -p "$target"
 cat >"$target/install.sh" <<'INSTALL'
 #!/bin/sh
@@ -89,7 +89,7 @@ run_documented_install() {
   expected_status=$6
   expected_log=$7
   log="$tmp/documented-$shell_name-$name.log"
-  rm -rf "$tmp/home/.config/omarchy/plugins/hancore.omaq"
+  rm -rf "$tmp/home/.config/omarchy/plugins/io.zet.harbor"
   : >"$log"
   if [ "$shell_name" = fish ]; then
     if HOME="$tmp/home" PATH="$test_path" OMAQ_INSTALL_TEST_LOG="$log" \
@@ -133,7 +133,7 @@ if [ -x /usr/bin/fish ]; then
 fi
 
 live_home="$tmp/live-home"
-live="$live_home/.config/omarchy/plugins/hancore.omaq"
+live="$live_home/.config/omarchy/plugins/io.zet.harbor"
 mkdir -p "$live/scripts" "$tmp/live-bin"
 sed -e "s#/usr/bin/omarchy#$tmp/live-bin/omarchy#g" \
   -e "s#/usr/bin/git#$tmp/live-bin/git#g" \
@@ -157,14 +157,14 @@ case "$*" in
     ;;
   "plugin list --json")
     printf 'plugin-state\n' >>"$OMAQ_INSTALL_TEST_LOG"
-    printf '[{"id":"hancore.omaq","enabled":%s,"firstParty":false,"kinds":["bar-widget"]}]\n' \
+    printf '[{"id":"io.zet.harbor","enabled":%s,"firstParty":false,"kinds":["bar-widget"]}]\n' \
       "${OMAQ_PLUGIN_ENABLED:-false}"
     ;;
   "pkg add toxcore libsignal-protocol-c libpulse libpng libjpeg-turbo libwebp ttf-material-symbols-variable qrencode")
     printf 'packages\n' >>"$OMAQ_INSTALL_TEST_LOG"
     exit "${OMAQ_PACKAGE_STATUS:-0}"
     ;;
-  "plugin enable hancore.omaq"|"plugin enable hancore.omaq --section left")
+  "plugin enable io.zet.harbor"|"plugin enable io.zet.harbor --section left")
     printf 'enable\n' >>"$OMAQ_INSTALL_TEST_LOG"
     case "${OMAQ_ENABLE_RESULT:-0}" in
       transient)
@@ -192,7 +192,7 @@ esac
 EOF
 cat >"$tmp/live-bin/omarchy-shell" <<'EOF'
 #!/bin/sh
-[ "$*" = "hancore.omaq status" ] || exit 96
+[ "$*" = "io.zet.harbor status" ] || exit 96
 [ "${OMARCHY_SHELL_IPC_TIMEOUT:-}" = "0.2s" ] || exit 98
 count=0
 [ ! -f "$OMAQ_IPC_COUNTER" ] || count=$(cat "$OMAQ_IPC_COUNTER")
@@ -393,13 +393,13 @@ if [ -s "$wrapper_log" ] ||
   exit 1
 fi
 
-mkdir -p "$tmp/home/.config/omarchy/plugins/hancore.omaq/scripts"
-cat >"$tmp/home/.config/omarchy/plugins/hancore.omaq/scripts/update-omaq.sh" <<'EOF'
+mkdir -p "$tmp/home/.config/omarchy/plugins/io.zet.harbor/scripts"
+cat >"$tmp/home/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >>"$OMAQ_UPDATE_TEST_LOG"
 exit "${OMAQ_UPDATE_STATUS:-0}"
 EOF
-chmod 755 "$tmp/home/.config/omarchy/plugins/hancore.omaq/scripts/update-omaq.sh"
+chmod 755 "$tmp/home/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh"
 run_update_case() {
   name=$1
   status=$2
@@ -438,14 +438,14 @@ for document in "$root/README.md" "$root/docs/INSTALLATION.md"; do
     echo "update-order: unsafe generic updater is not clearly rejected" >&2
     exit 1
   fi
-  grep -Fq 'omarchy plugin add https://github.com/HANCORE-linux/OmaQ.git --yes' \
+  grep -Fq 'omarchy plugin add https://github.com/MayberryDT/harbor.git --yes' \
     "$document" || {
     echo "update-order: normal plugin installation is missing" >&2
     exit 1
   }
 done
 
-if ! grep -Fq 'Do not update OmaQ with' "$root/README.md" ||
+if ! grep -Fq 'Do not update Harbor with' "$root/README.md" ||
     ! grep -Fq 'including the all-plugins form.' "$root/README.md"; then
   echo "update-order: README generic-updater warning changed" >&2
   exit 1
@@ -454,7 +454,7 @@ fi
   echo "update-order: README shell-refresh hints changed" >&2
   exit 1
 }
-grep -Fq 'If a successful install reports a current helper but OmaQ is still absent' \
+grep -Fq 'If a successful install reports a current helper but Harbor is still absent' \
   "$root/README.md" || {
   echo "update-order: install shell-refresh hint is not readiness-gated" >&2
   exit 1
@@ -463,12 +463,12 @@ grep -Fq "After an \`activated\` or \`current\` result" "$root/README.md" || {
   echo "update-order: update shell-refresh hint is not result-gated" >&2
   exit 1
 }
-if ! grep -Fq 'include OmaQ in an all-plugins' "$root/docs/INSTALLATION.md" ||
+if ! grep -Fq 'include Harbor in an all-plugins' "$root/docs/INSTALLATION.md" ||
     ! grep -Fq 'omarchy plugin update --yes' "$root/docs/INSTALLATION.md"; then
   echo "update-order: installation guide omits the all-plugins update risk" >&2
   exit 1
 fi
-grep -Fq 'fast-forwards the source checkout but has no OmaQ lifecycle hook to rebuild and verify the native helper' \
+grep -Fq 'fast-forwards the source checkout but has no Harbor lifecycle hook to rebuild and verify the native helper' \
   "$root/docs/INSTALLATION.md" || {
   echo "update-order: installation guide omits the helper rebuild risk" >&2
   exit 1

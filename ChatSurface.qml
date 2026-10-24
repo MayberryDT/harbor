@@ -8,7 +8,7 @@ import qs.Ui
 import qs.Commons
 import "pages" as Pages
 import "Model.js" as Model
-import "." as OmaQ
+import "." as Harbor
 
 Item {
   id: root
@@ -39,8 +39,8 @@ Item {
   readonly property var openCards: openCardModel
   property bool surfacesHydrated: false
   property string pulseConv: ""
-  readonly property bool demoOpen: OmaQ.SurfaceCoordinator.demoOpen
-  readonly property bool isSurfaceOwner: OmaQ.SurfaceCoordinator.owner === root
+  readonly property bool demoOpen: Harbor.SurfaceCoordinator.demoOpen
+  readonly property bool isSurfaceOwner: Harbor.SurfaceCoordinator.owner === root
   property bool ownershipTeardown: false
   property bool floatRulesReady: false
   property bool floatRuleReloadBlocked: false
@@ -58,7 +58,7 @@ Item {
   readonly property bool callToneNeeded: root.isSurfaceOwner && service &&
     !service.callToneSuppressed &&
     (service.lastCallState === "incoming" || service.lastCallState === "ringing")
-  readonly property bool callTonePlaying: OmaQ.CallTone.playing
+  readonly property bool callTonePlaying: Harbor.CallTone.playing
   property string callToneOwner: ""
   property var autoOpenByConversation: ({})
   property bool autoOpenLoaded: false
@@ -84,7 +84,7 @@ Item {
   readonly property color headerStatusColor: root.paletteColor("color02", root.theme().accent || Color.accent)
 
   onCallToneNeededChanged:
-    OmaQ.CallTone.setRequested(root.callToneOwner, root.callToneNeeded)
+    Harbor.CallTone.setRequested(root.callToneOwner, root.callToneNeeded)
 
   ListModel {
     id: openCardModel
@@ -190,19 +190,19 @@ Item {
 
   function openDemo() {
     if (root.floatRuleReloadBlocked)
-      OmaQ.SurfaceCoordinator.queueDemo()
+      Harbor.SurfaceCoordinator.queueDemo()
     else
-      OmaQ.SurfaceCoordinator.openDemo()
+      Harbor.SurfaceCoordinator.openDemo()
   }
 
   function closeDemo() {
-    OmaQ.SurfaceCoordinator.closeDemo()
+    Harbor.SurfaceCoordinator.closeDemo()
   }
 
   function openConversation(conv, name) {
     var conversation = String(conv || "")
     var expectedKey = conversation.charAt(0) === "g" ? "" : root.friendKey(conversation)
-    OmaQ.SurfaceCoordinator.requestChat(conversation, expectedKey, String(name || ""),
+    Harbor.SurfaceCoordinator.requestChat(conversation, expectedKey, String(name || ""),
       root.instanceName)
   }
 
@@ -233,21 +233,21 @@ Item {
     if (label.length > 48)
       label = label.slice(0, 48)
     var suffix = key
-    return "OmaQ chat — " + label + (suffix ? " · " + suffix : "")
+    return "Harbor chat — " + label + (suffix ? " · " + suffix : "")
   }
 
-  function focusOmaQWindow(windowObject, title) {
+  function focusHarborWindow(windowObject, title) {
     var target = String(title || "")
     if (!windowObject || !target)
       return
-    if (focusOmaQProc.running) {
+    if (focusHarborProc.running) {
       root.queuedFocusWindow = windowObject
       root.queuedFocusTitle = target
       return
     }
     root.pendingFocusWindow = windowObject
-    focusOmaQProc.command = [root.floatScriptPath, "focus-title", target]
-    focusOmaQProc.running = true
+    focusHarborProc.command = [root.floatScriptPath, "focus-title", target]
+    focusHarborProc.running = true
   }
 
   function paletteColor(id, fallback) {
@@ -622,7 +622,7 @@ Item {
       service.sendOp({ op: "surface.list" })
       root.requestAutoOpenState()
     }
-    OmaQ.SurfaceCoordinator.deliverPending()
+    Harbor.SurfaceCoordinator.deliverPending()
   }
 
   onIsSurfaceOwnerChanged: {
@@ -630,7 +630,7 @@ Item {
       root.ownershipTeardown = false
       root.floatRuleReloadBlocked = false
       root.activateSurfaceOwner()
-      OmaQ.CallTone.setRequested(root.callToneOwner, root.callToneNeeded)
+      Harbor.CallTone.setRequested(root.callToneOwner, root.callToneNeeded)
     } else {
       root.ownershipTeardown = true
       root.floatRuleReloadBlocked = false
@@ -639,17 +639,17 @@ Item {
       installFloatRules.running = false
       installFloatRulesRetry.stop()
       root.floatRulesReady = false
-      OmaQ.CallTone.setRequested(root.callToneOwner, false)
+      Harbor.CallTone.setRequested(root.callToneOwner, false)
     }
   }
 
   Component.onCompleted: {
-    root.callToneOwner = OmaQ.CallTone.acquireOwner()
-    OmaQ.SurfaceCoordinator.registerHost(root)
+    root.callToneOwner = Harbor.CallTone.acquireOwner()
+    Harbor.SurfaceCoordinator.registerHost(root)
   }
   Component.onDestruction: {
-    OmaQ.CallTone.setRequested(root.callToneOwner, false)
-    OmaQ.SurfaceCoordinator.unregisterHost(root)
+    Harbor.CallTone.setRequested(root.callToneOwner, false)
+    Harbor.SurfaceCoordinator.unregisterHost(root)
   }
 
   component SurfaceBtn: Button {
@@ -708,16 +708,16 @@ Item {
     SurfaceBtn {
       visible: toolbar.page && !toolbar.page.inCall && !toolbar.page.incoming &&
         !toolbar.page.callEnding && !toolbar.page.callActionPending
-      iconText: OmaQ.MaterialSymbols.ready ? "\ue0b0" : "?"
-      fontFamily: OmaQ.MaterialSymbols.family
+      iconText: Harbor.MaterialSymbols.ready ? "\ue0b0" : "?"
+      fontFamily: Harbor.MaterialSymbols.family
       helpText: "Start call with " + (toolbar.page ? toolbar.page.peerName : "contact")
       onClicked: toolbar.page.startCall()
     }
     SurfaceBtn {
       visible: toolbar.page && toolbar.page.incoming && !toolbar.page.inCall &&
         !toolbar.page.callEnding && !toolbar.page.callActionPending
-      iconText: OmaQ.MaterialSymbols.ready ? "\ue0b0" : "?"
-      fontFamily: OmaQ.MaterialSymbols.family
+      iconText: Harbor.MaterialSymbols.ready ? "\ue0b0" : "?"
+      fontFamily: Harbor.MaterialSymbols.family
       helpText: "Answer call from " + (toolbar.page ? toolbar.page.peerName : "contact")
       bordered: true
       selected: true
@@ -726,8 +726,8 @@ Item {
     SurfaceBtn {
       visible: toolbar.page && toolbar.page.incoming && !toolbar.page.inCall &&
         !toolbar.page.callEnding && !toolbar.page.callActionPending
-      iconText: OmaQ.MaterialSymbols.ready ? "\ue0b1" : "?"
-      fontFamily: OmaQ.MaterialSymbols.family
+      iconText: Harbor.MaterialSymbols.ready ? "\ue0b1" : "?"
+      fontFamily: Harbor.MaterialSymbols.family
       helpText: "Decline call from " + (toolbar.page ? toolbar.page.peerName : "contact")
       bordered: true
       onClicked: toolbar.page.hangUp()
@@ -735,8 +735,8 @@ Item {
     SurfaceBtn {
       visible: toolbar.page && toolbar.page.inCall && !toolbar.page.callEnding &&
         !toolbar.page.callActionPending
-      iconText: OmaQ.MaterialSymbols.ready ? "\ue0b1" : "?"
-      fontFamily: OmaQ.MaterialSymbols.family
+      iconText: Harbor.MaterialSymbols.ready ? "\ue0b1" : "?"
+      fontFamily: Harbor.MaterialSymbols.family
       helpText: "End call with " + (toolbar.page ? toolbar.page.peerName : "contact")
       bordered: true
       selected: true
@@ -999,7 +999,7 @@ Item {
   function desktopNotify() {
     if (!notifyDesk)
       return
-    noteProc.command = ["notify-send", "-a", "OmaQ", "OmaQ", "New message"]
+    noteProc.command = ["notify-send", "-a", "Harbor", "Harbor", "New message"]
     noteProc.running = true
   }
 
@@ -1103,13 +1103,13 @@ Item {
       if (!root.isSurfaceOwner)
         return
       if (code !== 0) {
-        console.warn("OmaQ: could not install first-map floating rules; retrying")
+        console.warn("Harbor: could not install first-map floating rules; retrying")
         installFloatRulesRetry.restart()
         return
       }
       root.floatRulesReady = true
       root.floatRuleReloadBlocked = false
-      OmaQ.SurfaceCoordinator.deliverPendingDemo()
+      Harbor.SurfaceCoordinator.deliverPendingDemo()
       if (!floatRuleWatcher.running)
         floatRuleWatcher.running = true
       root.flushPendingSurfaceOpens()
@@ -1148,7 +1148,7 @@ Item {
       floatRuleWatcher.running = true
   }
   Process {
-    id: focusOmaQProc
+    id: focusHarborProc
     onExited: function(code) {
       var target = root.pendingFocusWindow
       root.pendingFocusWindow = null
@@ -1159,7 +1159,7 @@ Item {
         var queuedTitle = root.queuedFocusTitle
         root.queuedFocusWindow = null
         root.queuedFocusTitle = ""
-        Qt.callLater(function() { root.focusOmaQWindow(queuedWindow, queuedTitle) })
+        Qt.callLater(function() { root.focusHarborWindow(queuedWindow, queuedTitle) })
       }
     }
   }
@@ -1430,7 +1430,7 @@ Item {
       // Keep the first map title stable for the floating rule, then expose a
       // per-conversation title so an existing chat can be moved precisely.
       title: pinWin.everShown && pinWin.modelData
-        ? root.chatWindowTitle(pinWin.modelData.conversation) : "OmaQ chat"
+        ? root.chatWindowTitle(pinWin.modelData.conversation) : "Harbor chat"
       property int desiredWidth: pinWin.boundedWidth(pinWin.surfaceWidth)
       property int desiredHeight: pinWin.boundedHeight(pinWin.surfaceHeight)
       property int pendingWidth: pinWin.boundedWidth(pinWin.surfaceWidth)
@@ -1533,7 +1533,7 @@ Item {
             geometry.x, geometry.y, true, pinWin.directKey,
             geometry.width, geometry.height)
         else
-          console.warn("OmaQ: could not restore independent chat geometry; manual geometry is enabled")
+          console.warn("Harbor: could not restore independent chat geometry; manual geometry is enabled")
       }
 
       function applyRequestedFocus() {
@@ -1542,7 +1542,7 @@ Item {
           return
         Qt.callLater(function() {
           if (pinWin.visible && placement.settled && !pinWin.placeOnMap)
-            root.focusOmaQWindow(pinWin, pinWin.title)
+            root.focusHarborWindow(pinWin, pinWin.title)
         })
       }
 
@@ -1550,7 +1550,7 @@ Item {
         var requestedConversation = pinWin.modelData
           ? String(pinWin.modelData.conversation) : ""
         if (!moved)
-          console.warn("OmaQ: could not move chat to the current workspace")
+          console.warn("Harbor: could not move chat to the current workspace")
         else if (placement.settled && pinWin.compositorFloating)
           Qt.callLater(function() { pinWin.requestCurrentGeometry(false) })
         var win = pinPage.QsWindow.window
@@ -1633,7 +1633,7 @@ Item {
           return
         if (!placement.settled ||
             (!pinWin.compositorFloating && !closeAfter) ||
-            pinWin.title === "OmaQ chat") {
+            pinWin.title === "Harbor chat") {
           if (pinWin.closePending) {
             pinWin.closePending = false
             pinWin.performClose()
@@ -1683,7 +1683,7 @@ Item {
         scriptPath: root.floatScriptPath
         windowTitle: pinWin.title
         placementRequested: pinWin.placeOnMap
-        windowReady: pinWin.backingWindowVisible && pinWin.title !== "OmaQ chat"
+        windowReady: pinWin.backingWindowVisible && pinWin.title !== "Harbor chat"
         requestedX: Math.round(pinWin.surfaceX)
         requestedY: Math.round(pinWin.surfaceY)
         requestedWidth: pinWin.boundedWidth(pinWin.surfaceWidth)
@@ -1904,7 +1904,7 @@ Item {
   FloatingWindow {
     id: demoWin
     visible: root.isSurfaceOwner && root.floatRulesReady && root.demoOpen
-    title: "OmaQ demo"
+    title: "Harbor demo"
     implicitWidth: 420
     implicitHeight: 480
     minimumSize: Qt.size(360, 420)
@@ -1917,7 +1917,7 @@ Item {
             demoPage.resetDemo()
         })
       } else if (root.demoOpen && root.isSurfaceOwner && root.floatRulesReady) {
-        OmaQ.SurfaceCoordinator.closeDemo()
+        Harbor.SurfaceCoordinator.closeDemo()
       }
     }
 

@@ -1,18 +1,18 @@
 # Trigger-free source update follow-up
 
-This note records the shell-off source workflow added after `v0.8.1-beta.1`. It replaces the documented active-tree update command without changing OmaQ's protocol or QML behavior.
+This note records the shell-off source workflow added after `v0.8.1-beta.1`. It replaces the documented active-tree update command without changing Harbor's protocol or QML behavior.
 
 ## Incident boundary
 
 Omarchy's `PluginRegistry` runs its own recursive `inotifywait` process for the complete user plugin directory. A local plugin event starts a debounced reload that unloads and recreates plugin panels, services, and widgets. `QS_DISABLE_FILE_WATCHER=1` disables Quickshell's watcher, not this registry process.
 
-A coredump correlated OmaQ write events with a generic QML loader path ending in `__dynamic_cast`. A later shell-off rollback reproduced the same `QQuickLoader::setSource` → `QQmlComponent::create` → `__dynamic_cast` stack when it stopped a still-loading shell. The exact unsymbolized Quickshell function remains unknown. The shell supervisor restored the interface in both cases, while OmaQ's detached helper and persisted state remained available.
+A coredump correlated Harbor write events with a generic QML loader path ending in `__dynamic_cast`. A later shell-off rollback reproduced the same `QQuickLoader::setSource` → `QQmlComponent::create` → `__dynamic_cast` stack when it stopped a still-loading shell. The exact unsymbolized Quickshell function remains unknown. The shell supervisor restored the interface in both cases, while Harbor's detached helper and persisted state remained available.
 
 ## Source transaction
 
 The updater now:
 
-- requires a clean Git-managed `main` checkout with the canonical OmaQ `origin`
+- requires a clean Git-managed `main` checkout with the canonical Harbor `origin`
 - uses fixed system Git commands, sanitized Git configuration and transport state, canonical HTTPS, optional exact-commit binding, and a fresh private credential-free `HOME` for each public network operation
 - refuses runtime or state staging paths that resolve inside the monitored plugin directory
 - resolves canonical `origin/main` first and skips staging plus the shell stop when the live commit already matches
@@ -29,7 +29,7 @@ The updater now:
 - retains the old checkout outside the monitored directory as the rollback tree
 - tolerates only the Omarchy restart wrapper's exact readiness-timeout result, waits for exactly one ready supervisor, Quickshell process, and recursive watcher, then rechecks the session lock
 - binds all three restarted process identities through every consumer poll
-- validates `listPlugins`, the OmaQ IPC target, running and available helper hashes, protocol compatibility, and the correlated post-start journal before and after helper activation
+- validates `listPlugins`, the Harbor IPC target, running and available helper hashes, protocol compatibility, and the correlated post-start journal before and after helper activation
 - restores the old tree under the same shell-off boundary when a consumer check fails before helper activation, terminating each exact replacement supervisor that appears while the rollback stop is in progress
 - returns failure without a tree rollback if final verification fails after the helper process may have changed
 

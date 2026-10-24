@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Update a live OmaQ checkout without writing while the shell watches it."""
+"""Update a live Harbor checkout without writing while the shell watches it."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ import time
 from typing import Callable
 
 
-PLUGIN_ID = "hancore.omaq"
-CANONICAL_ORIGIN = "https://github.com/HANCORE-linux/OmaQ.git"
+PLUGIN_ID = "io.zet.harbor"
+CANONICAL_ORIGIN = "https://github.com/MayberryDT/harbor.git"
 MAX_CAPTURE = 1024 * 1024
 MAX_TREE_BYTES = 512 * 1024 * 1024
 MAX_TREE_ENTRIES = 50000
@@ -1281,12 +1281,12 @@ class ShellController:
             if isinstance(item, dict) and item.get("id") == PLUGIN_ID
         ]
         if len(matches) != 1:
-            fail("plugin list does not contain exactly one OmaQ entry")
+            fail("plugin list does not contain exactly one Harbor entry")
         entry = matches[0]
         if entry.get("enabled") is not True or entry.get("firstParty") is not False:
-            fail("OmaQ must be an enabled third-party plugin before update")
+            fail("Harbor must be an enabled third-party plugin before update")
         if "bar-widget" not in entry.get("kinds", []):
-            fail("OmaQ bar-widget kind is unavailable")
+            fail("Harbor bar-widget kind is unavailable")
 
     def consumer_ready(
         self,
@@ -1305,7 +1305,7 @@ class ShellController:
             self.assert_same_shell(expected_shell)
             failed_line = self.journal_failed(cursor)
             if failed_line:
-                fail(f"new shell reported an OmaQ loader failure: {failed_line}")
+                fail(f"new shell reported a Harbor loader failure: {failed_line}")
             try:
                 listed = run(
                     [self.omarchy, "plugin", "list", "--json"],
@@ -1324,16 +1324,16 @@ class ShellController:
                     if isinstance(item, dict) and item.get("id") == PLUGIN_ID
                 ]
                 if len(matches) != 1:
-                    last_error = "plugin list does not contain exactly one OmaQ entry"
+                    last_error = "plugin list does not contain exactly one Harbor entry"
                     time.sleep(0.1)
                     continue
                 entry = matches[0]
                 if entry.get("enabled") is not True or entry.get("firstParty") is not False:
-                    last_error = "OmaQ is not an enabled third-party plugin"
+                    last_error = "Harbor is not an enabled third-party plugin"
                     time.sleep(0.1)
                     continue
                 if "bar-widget" not in entry.get("kinds", []):
-                    last_error = "OmaQ bar-widget kind is unavailable"
+                    last_error = "Harbor bar-widget kind is unavailable"
                     time.sleep(0.1)
                     continue
                 ipc = run(
@@ -1344,7 +1344,7 @@ class ShellController:
                     env=self.ipc_env,
                 )
                 if ipc.returncode != 0:
-                    last_error = "OmaQ IPC target is unavailable"
+                    last_error = "Harbor IPC target is unavailable"
                     time.sleep(0.1)
                     continue
                 helper = helper_call(
@@ -1359,7 +1359,7 @@ class ShellController:
                 )
                 failed_line = self.journal_failed(cursor)
                 if failed_line:
-                    fail(f"new shell reported an OmaQ loader failure: {failed_line}")
+                    fail(f"new shell reported a Harbor loader failure: {failed_line}")
                 self.assert_same_shell(expected_shell)
                 return helper
             except UpdateError as error:
@@ -1565,10 +1565,10 @@ def validate_git_checkout(root: Path, *, expected_origin: str) -> str:
     lstat_directory(root / ".git")
     branch = git_output(root, ["symbolic-ref", "--short", "HEAD"], "git branch")
     if branch != "main":
-        fail(f"OmaQ checkout is not on main: {branch}")
+        fail(f"Harbor checkout is not on main: {branch}")
     origin = git_output(root, ["remote", "get-url", "origin"], "git origin")
     if origin != expected_origin:
-        fail(f"unexpected OmaQ origin: {origin}")
+        fail(f"unexpected Harbor origin: {origin}")
     head = git_output(root, ["rev-parse", "--verify", "HEAD"], "git HEAD")
     if not HEX_40.fullmatch(head):
         fail("Git returned an invalid HEAD commit")
@@ -1613,7 +1613,7 @@ def validate_manifest(root: Path) -> None:
         os.close(fd)
     value = strict_json(bounded_text(raw, "manifest.json"), "manifest.json")
     if not isinstance(value, dict) or value.get("id") != PLUGIN_ID:
-        fail("plugin manifest does not identify OmaQ")
+        fail("plugin manifest does not identify Harbor")
 
 
 def validate_plugin(root: Path) -> None:
@@ -1888,7 +1888,7 @@ class UpdateLock:
             fcntl.flock(source_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             os.close(source_fd)
-            fail("another OmaQ source update is active")
+            fail("another Harbor source update is active")
         self.fds.append(source_fd)
 
         # Serialize with update-helper.sh, which flocks this exact private
@@ -1960,7 +1960,7 @@ class Updater:
 
     def preflight(self) -> tuple[str, dict, ShellProcesses]:
         if os.geteuid() == 0:
-            fail("refusing to update OmaQ as root")
+            fail("refusing to update Harbor as root")
         self.shell.refuse_locked_session()
         initial_shell = self.shell.assert_running()
         self.shell.require_enabled_plugin()
@@ -2236,7 +2236,7 @@ class Updater:
 
     def rollback_helper(self) -> dict:
         if os.geteuid() == 0:
-            fail("refusing to update OmaQ as root")
+            fail("refusing to update Harbor as root")
         self.shell.refuse_locked_session()
         self.shell.assert_running()
         self.shell.require_enabled_plugin()
@@ -2309,7 +2309,7 @@ class Updater:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="update-omaq.sh",
-        description="Stage, build, and atomically activate an OmaQ source update.",
+        description="Stage, build, and atomically activate a Harbor source update.",
     )
     parser.add_argument(
         "--expect-commit", default="", help="require this exact origin/main commit"

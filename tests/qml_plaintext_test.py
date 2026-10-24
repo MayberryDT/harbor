@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce explicit plain-text rendering at OmaQ's QML trust boundary."""
+"""Enforce explicit plain-text rendering at Harbor's QML trust boundary."""
 
 from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,19 +18,19 @@ import threading
 ROOT = Path(__file__).resolve().parents[1]
 QML_POLICY_SHA256 = {
     "CallTone.qml": "12d873ec1b774ed038fb526b0b2b7fd2a1a71e97d9987aa27fef06f6f4d93ddc",
-    "ChatSurface.qml": "5db1eec01d51f767172f43b48e976c153719874daca247c48a373d07fa929e36",
-    "MaterialSymbols.qml": "e4f62d5c50be23a97149725d74e87f3427666ccd72ca6e12e088b3dd0b82b70e",
-    "Panel.qml": "392aa09c59453b2023c7091cc190d7cdd144ed420433f67e291452bec24e2c6b",
-    "PlacementController.qml": "82f72fcee9a6aceeb6d1015095fea4961eb2cddbdc11943ef410e160060df76a",
+    "ChatSurface.qml": "44d7e94d20a4a771705d37c8efbdb36c26bb90f3b3500b3aec8e370f20b78fb6",
+    "MaterialSymbols.qml": "61ba207e579acabc5c5a842d9c8cd39bf8773f3b4b617951f09c4d373adb9629",
+    "Panel.qml": "8232838bab41514a228d112fb655174d14091f143ed0cf2ce66e98625d2d1837",
+    "PlacementController.qml": "87b297b7d63b939812d4f1a436b98e494446a618b6950c43d590c84562fae71f",
     "SafeText.qml": "a8bfa2ea5e13cbd50bf7e9c70995bea06ceeaca9c9d61e63b243ce18a830e354",
-    "Service.qml": "ffd4171eb4506e6722fcb0747cf99bbf3c4fc341a9877fb20a5c3c1ab7ddf5ec",
+    "Service.qml": "bb9d37d43b99a2bfcae751415079df28c317fa34d0f507d4fd0de927cac19da6",
     "SurfaceCoordinator.qml": "c206242de180c0b3a02b5ac50af9ba7e2486be1b0f585ed6ab8983979b0666f0",
-    "pages/ChatPage.qml": "a9a112f8918b09603c83156a0af7866df7621d7d812f75acf59678dc1843b4c1",
+    "pages/ChatPage.qml": "95baf521448c7a7a8296b27e7a6cf6c1d71d47650ce9fe8f85b63a9c3fb288b3",
 }
 TEXT_KINDS = (
     "Controls.TextArea",
     "Controls.Label",
-    "OmaQ.SafeText",
+    "Harbor.SafeText",
     "SafeText",
     "TextEdit",
     "TextArea",
@@ -82,7 +82,7 @@ MENU_WRAPPER_DECLARATION = re.compile(
 EMPTY_CONTEXT_MENU = re.compile(r"^\s*delegate\s*:\s*ContextMenuItem\s*\{\s*}\s*$")
 FORBIDDEN_INDIRECT = re.compile(r"\b(?:Binding|PropertyChanges)\b")
 RELEVANT_KIND_COMMENT = re.compile(
-    r"\b(?:Text|SafeText|OmaQ\.SafeText|Label|TextEdit|TextArea|Controls\.Label|Controls\.TextArea|" +
+    r"\b(?:Text|SafeText|Harbor\.SafeText|Label|TextEdit|TextArea|Controls\.Label|Controls\.TextArea|" +
     INHERITED_TEXT_CONTROL + r")\s*/[/*]"
 )
 TEXT_FORMAT_ASSIGNMENT = re.compile(
@@ -146,10 +146,10 @@ COMPUTED_WRITE_ALLOWLIST = {
 REVIEWED_COMPUTED_IDS = set().union(*COMPUTED_WRITE_ALLOWLIST.values())
 COMPUTED_WRITE_SOURCE_SHA256 = {
     "CallTone.qml": "8d9a0af95e58b888dfd09e37c198684843aa10d306f815abc868b88c61496c86",
-    "ChatSurface.qml": "f2454a007e434f61efb711b881261c722405e625dbfd7769ee3c8230949444a5",
-    "Panel.qml": "2fc1a84d3c8a9842215b990236b56e7e30252b48551d9717d86fa0b920933edb",
-    "Service.qml": "2395f4a77de4bc06a4cd21ad77bdd19fe98c9d41b2bd48de7bfb69eb1d383809",
-    "pages/ChatPage.qml": "1eef27f59165b114dfce943780132009f5491ed96eaccafde3486a7c5e6a28f8",
+    "ChatSurface.qml": "72b1ad04de06bf4e0752f2bb47a7b36cdedcdeccc2e6f645daf9c911de5134ac",
+    "Panel.qml": "8c4d6149f70c21ba36c52c512c7b689f67a8d409a25caf3531d1e394eaf91214",
+    "Service.qml": "644497aa6de0b05ed93d3d84202a8ba77c4cd044632c99f1ec8e151c629f3040",
+    "pages/ChatPage.qml": "7b6515d13e4364d03df11445feb08621397b9621742e3bb51fd8de039d66fbb2",
 }
 REVIEWED_MODEL_MUTATION_IDS = {
     "pages/ChatPage.qml": {"groupReceiptModel"},
@@ -197,7 +197,7 @@ PLAIN_INPUT_IDS = {
     "passField", "unlockField",
 }
 EXPECTED_PLAIN = {
-    "OmaQ.SafeText": "Text.PlainText",
+    "Harbor.SafeText": "Text.PlainText",
     "SafeText": "Text.PlainText",
     "Text": "Text.PlainText",
     "Label": "Text.PlainText",
@@ -476,7 +476,7 @@ def check_text_objects(path: Path, lines: list[str], rich: list[tuple[str, int, 
         value = direct_property(block, match.group("indent"), "textFormat")
         location = f"{path.relative_to(ROOT)}:{index + 1}"
         if not value:
-            if match.group("kind") in {"SafeText", "OmaQ.SafeText"}:
+            if match.group("kind") in {"SafeText", "Harbor.SafeText"}:
                 continue
             fail(f"missing explicit textFormat at {location}")
         if "AutoText" in value:
@@ -507,7 +507,7 @@ def check_tooltips(path: Path, lines: list[str]) -> None:
         block = lines[index + 1 : end]
         content = direct_property(block, match.group("indent"), "contentItem")
         location = f"{path.relative_to(ROOT)}:{index + 1}"
-        if not content.startswith(("Text {", "SafeText {", "OmaQ.SafeText {")):
+        if not content.startswith(("Text {", "SafeText {", "Harbor.SafeText {")):
             fail(f"tooltip relies on an implicit or unreviewed text item at {location}")
 
 
@@ -548,7 +548,7 @@ def check_external_components(path: Path, lines: list[str], external_ids: set[st
             # Only these two literal call glyphs may depend on font readiness.
             # The source hash also binds the singleton's boolean ready contract.
             ready_icon = (kind == "SurfaceBtn" and path == ROOT / "ChatSurface.qml" and
-                          re.fullmatch(r'OmaQ\.MaterialSymbols\.ready\s*\?\s*"\\u(?:e0b0|e0b1)"\s*:\s*"\?"', icon))
+                          re.fullmatch(r'Harbor\.MaterialSymbols\.ready\s*\?\s*"\\u(?:e0b0|e0b1)"\s*:\s*"\?"', icon))
             if icon and expression_references(icon) and not ready_icon:
                 fail(f"dynamic text reaches external {kind} icon at {location}")
         if kind in ALLOWED_EXTERNAL_LABEL_REFS:
@@ -562,9 +562,9 @@ def check_external_components(path: Path, lines: list[str], external_ids: set[st
         if kind == "BarIconButton":
             allowed = {"omaq.incomingCall", "omaq.pending", "omaq.pendingGroup"}
             text_allowed = allowed
-            ready_bar = r'omaq.incomingCall?(OmaQ.MaterialSymbols.ready?"\ue0b0":"?"):(omaq.pending?"":"󰭹")'
+            ready_bar = r'omaq.incomingCall?(Harbor.MaterialSymbols.ready?"\ue0b0":"?"):(omaq.pending?"":Harbor.MaterialSymbols.glyph("anchor"))'
             if path == ROOT / "Panel.qml" and re.sub(r"\s+", "", text) == ready_bar:
-                text_allowed = allowed | {"OmaQ.MaterialSymbols.ready"}
+                text_allowed = allowed | {"Harbor.MaterialSymbols.ready", "Harbor.MaterialSymbols.glyph"}
             if expression_references(text) - text_allowed or expression_references(tooltip) - allowed:
                 fail(f"remote value reaches external BarIconButton text at {location}")
 
@@ -934,8 +934,8 @@ def check_adversarial_controls() -> None:
         "SafeText RichText override",
     )
 
-    safe_icon = r'OmaQ.MaterialSymbols.ready ? "\ue0b0" : "?"'
-    safe_bar = r'omaq.incomingCall ? (OmaQ.MaterialSymbols.ready ? "\ue0b0" : "?") : (omaq.pending ? "" : "󰭹")'
+    safe_icon = r'Harbor.MaterialSymbols.ready ? "\ue0b0" : "?"'
+    safe_bar = r'omaq.incomingCall ? (Harbor.MaterialSymbols.ready ? "\ue0b0" : "?") : (omaq.pending ? "" : Harbor.MaterialSymbols.glyph("anchor"))'
     for path, kind, prop, value in (
         (ROOT / "ChatSurface.qml", "SurfaceBtn", "iconText", safe_icon),
         (ROOT / "ChatSurface.qml", "SurfaceBtn", "iconText", safe_icon.replace("e0b0", "e0b1")),
@@ -945,11 +945,11 @@ def check_adversarial_controls() -> None:
         lines = format_qml_text(source).splitlines()
         check_external_components(path, lines, set())
         expect_full_policy_forbidden(source, "font-ready icon on another source path")
-        for replacement in ('service.lastChatText', 'OmaQ.MaterialSymbols.glyph("call")',
+        for replacement in ('service.lastChatText', 'Harbor.MaterialSymbols.glyph("call")',
                             '"<img src=\\\"https://invalid.example/icon\\\">"'):
             hostile = source.replace(r'"\ue0b0"', replacement).replace(r'"\ue0b1"', replacement)
             expect_full_policy_forbidden(hostile, "dynamic or markup font-ready icon", path)
-        expect_full_policy_forbidden(source.replace('OmaQ.MaterialSymbols.ready', 'service.ready'),
+        expect_full_policy_forbidden(source.replace('Harbor.MaterialSymbols.ready', 'service.ready'),
                                      "unreviewed readiness producer", path)
     expect_full_policy_forbidden(
         'import QtQuick\nItem {\n  SurfaceBtn { iconText: ' + safe_icon + '; tooltipText: service.lastChatText }\n}\n',

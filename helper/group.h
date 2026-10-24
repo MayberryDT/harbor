@@ -12,7 +12,7 @@
 #define OMAQ_GROUP_TITLE_MAX 48
 #define OMAQ_GROUP_MEMBER_NAME_MAX 128
 #define OMAQ_GROUP_MEMBER_KEY_HEX 64
-#define OMAQ_GROUP_MESSAGE_MAX 1399
+#define OMAQ_GROUP_MESSAGE_MAX (65536u + 256u)
 
 int omaq_group_title_bytes_ok(const char *title, size_t len);
 int omaq_group_member_name_bytes_ok(const char *name, size_t len);

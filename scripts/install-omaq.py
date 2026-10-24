@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Build and install a complete OmaQ checkout while the shell is stopped."""
+"""Build and install a complete Harbor checkout while the shell is stopped."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ sys.dont_write_bytecode = True
 CORE_PATH = Path(__file__).absolute().parent / "update-omaq.py"
 SPEC = importlib.util.spec_from_file_location("omaq_source_install_core", CORE_PATH)
 if SPEC is None or SPEC.loader is None:
-    raise RuntimeError("cannot load the OmaQ source transaction core")
+    raise RuntimeError("cannot load the Harbor source transaction core")
 core = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = core
 SPEC.loader.exec_module(core)
@@ -51,7 +51,7 @@ def target_absent(path: Path) -> None:
         return
     except OSError as error:
         fail(f"cannot inspect installation target: {error}")
-    fail(f"OmaQ installation target already exists: {path}")
+    fail(f"Harbor installation target already exists: {path}")
 
 
 def plugin_enabled_in_shell_config(value: object) -> bool:
@@ -134,13 +134,13 @@ def persisted_shell_config() -> object | None:
 def require_persisted_plugin_disabled() -> None:
     config = persisted_shell_config()
     if config is not None and plugin_enabled_in_shell_config(config):
-        fail("persisted shell config enables OmaQ before installation")
+        fail("persisted shell config enables Harbor before installation")
 
 
 def require_persisted_plugin_enabled() -> None:
     config = persisted_shell_config()
     if config is None or not plugin_enabled_in_shell_config(config):
-        fail("persisted shell config does not enable OmaQ")
+        fail("persisted shell config does not enable Harbor")
 
 
 def shell_ipc_response_was_lost(result: subprocess.CompletedProcess) -> bool:
@@ -212,11 +212,11 @@ def require_plugin_absent(
         try:
             entries = plugin_entries(shell)
             if entries:
-                fail("the running shell already knows an OmaQ plugin")
+                fail("the running shell already knows a Harbor plugin")
             config = running_shell_config(shell)
             if plugin_enabled_in_shell_config(config):
                 fail(
-                    "shell config still enables OmaQ while its source tree is absent"
+                    "shell config still enables Harbor while its source tree is absent"
                 )
             return
         except ShellIpcTransitionError:
@@ -227,21 +227,21 @@ def require_plugin_absent(
 
 def validate_plugin_entries(entries: list[dict], *, enabled: bool) -> None:
     if len(entries) != 1:
-        fail("plugin list does not contain exactly one OmaQ entry")
+        fail("plugin list does not contain exactly one Harbor entry")
     entry = entries[0]
     if entry.get("firstParty") is not False:
-        fail("OmaQ is not a third-party plugin")
+        fail("Harbor is not a third-party plugin")
     actual_enabled = entry.get("enabled")
     if actual_enabled is not enabled:
         state = "enabled" if enabled else "disabled"
         if not enabled and actual_enabled is True:
             raise ActivationPossibleError(
-                "OmaQ became enabled before the controlled enable operation"
+                "Harbor became enabled before the controlled enable operation"
             )
-        fail(f"OmaQ is not a {state} third-party plugin")
+        fail(f"Harbor is not a {state} third-party plugin")
     kinds = entry.get("kinds")
     if not isinstance(kinds, list) or "bar-widget" not in kinds:
-        fail("OmaQ bar-widget kind is unavailable")
+        fail("Harbor bar-widget kind is unavailable")
 
 
 def require_plugin_state(shell: core.ShellController, *, enabled: bool) -> None:
@@ -286,7 +286,7 @@ def wait_plugin_state(
         shell.assert_same_shell(expected_shell)
         failed_line = shell.journal_failed(cursor)
         if failed_line:
-            fail(f"new shell reported an OmaQ loader failure: {failed_line}")
+            fail(f"new shell reported a Harbor loader failure: {failed_line}")
         try:
             entries = plugin_entries(shell)
         except ShellIpcTransitionError:
@@ -298,7 +298,7 @@ def wait_plugin_state(
         validate_plugin_entries(entries, enabled=enabled)
         shell.assert_same_shell(expected_shell)
         return
-    fail("plugin discovery did not produce an OmaQ entry")
+    fail("plugin discovery did not produce a Harbor entry")
 
 
 def ignored_records(root: Path) -> list[bytes]:
@@ -772,7 +772,7 @@ class Installer:
 
     def preflight(self) -> tuple[str, int, core.ShellProcesses]:
         if os.geteuid() == 0:
-            fail("refusing to install OmaQ as root")
+            fail("refusing to install Harbor as root")
         self.shell.refuse_locked_session()
         initial_shell = self.shell.assert_running()
         target_absent(self.root)
@@ -905,7 +905,7 @@ class Installer:
             require_plugin_absent(self.shell)
             self.shell.assert_same_shell(restored_shell)
             if self.shell.journal_failed(cursor):
-                fail("shell reported an OmaQ loader failure after install rollback")
+                fail("shell reported a Harbor loader failure after install rollback")
         except Exception as error:
             rollback_error = error
         if rollback_error is not None:
@@ -963,7 +963,7 @@ class Installer:
                 f"disable failed ({disable_error}); the shell was stopped"
             )
         fail(
-            f"installation failed after activation became possible; OmaQ was "
+            f"installation failed after activation became possible; Harbor was "
             f"disabled and the installed tree remains for recovery: "
             f"{original_error}"
         )
@@ -1055,11 +1055,11 @@ def link_cli(root: Path) -> None:
             timeout=10,
         )
         text = (
-            core.bounded_text(result.stdout, "omaq-connect link stdout")
-            + core.bounded_text(result.stderr, "omaq-connect link stderr")
+            core.bounded_text(result.stdout, "harbor-connect link stdout")
+            + core.bounded_text(result.stderr, "harbor-connect link stderr")
         ).strip()
     except (core.UpdateError, OSError, ValueError) as error:
-        text = f"omaq-connect: command not linked ({error})"
+        text = f"harbor-connect: command not linked ({error})"
     if text:
         print(text)
 
@@ -1081,7 +1081,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--section",
         choices=("left", "center", "right"),
         default=None,
-        help="place OmaQ in this bar section (default: manifest setting)",
+        help="place Harbor in this bar section (default: manifest setting)",
     )
     parser.add_argument(
         "--yes", action="store_true", help="confirm the temporary shell stop"

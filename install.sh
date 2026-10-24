@@ -10,7 +10,7 @@ usage() {
   cat <<'EOF'
 Usage: ./install.sh [--section left|center|right] [--expect-commit COMMIT] --yes
 
-Install OmaQ's package dependencies and build its helper. When this script is
+Install Harbor's package dependencies and build its helper. When this script is
 run from the live Omarchy plugin checkout, it waits for reactive plugin
 activation and verifies the running helper. An external checkout uses the
 verified shell-off installer.
@@ -78,13 +78,13 @@ if [ -n "$expected_commit" ]; then
 fi
 
 [ "$confirmed" -eq 1 ] ||
-  fail "refusing to install packages or enable OmaQ without --yes"
-[ "$(/usr/bin/id -u)" -ne 0 ] || fail "refusing to install OmaQ as root"
+  fail "refusing to install packages or enable Harbor without --yes"
+[ "$(/usr/bin/id -u)" -ne 0 ] || fail "refusing to install Harbor as root"
 umask 077
 
 root=$(CDPATH='' cd -- "$(/usr/bin/dirname -- "$0")" && pwd -P)
 home=$(CDPATH='' cd -- "$HOME" && pwd -P)
-live_root="$home/.config/omarchy/plugins/hancore.omaq"
+live_root="$home/.config/omarchy/plugins/io.zet.harbor"
 installer="$root/scripts/install-omaq.sh"
 helper_runtime="$root/scripts/helper-runtime.py"
 
@@ -116,16 +116,16 @@ if [ "$root" = "$live_root" ]; then
   plugin_json=$(PATH=/usr/bin:/bin /usr/bin/omarchy plugin list --json) ||
     fail "could not verify the live plugin state"
   plugin_enabled=$(printf '%s\n' "$plugin_json" | /usr/bin/jq -er \
-    --arg id hancore.omaq '
+    --arg id io.zet.harbor '
       [.[] | select(.id == $id)] |
       if length == 1 and .[0].firstParty == false and
           (. [0].kinds | index("bar-widget") != null) and
           (. [0].enabled | type) == "boolean"
       then (if .[0].enabled then "enabled" else "disabled" end)
-      else error("unexpected OmaQ plugin state") end
+      else error("unexpected Harbor plugin state") end
     ') || fail "live plugin state is invalid or ambiguous"
   [ "$plugin_enabled" = disabled ] ||
-    fail "OmaQ became enabled before its helper was built; disable it and retry"
+    fail "Harbor became enabled before its helper was built; disable it and retry"
 
   head=$(GIT_OPTIONAL_LOCKS=0 PATH=/usr/bin:/bin \
     /usr/bin/git -C "$root" rev-parse --verify HEAD) ||
@@ -149,10 +149,10 @@ if [ "$root" = "$live_root" ]; then
   trap cleanup_enable_tmp EXIT HUP INT TERM
   set +e
   if [ -n "$section" ]; then
-    PATH=/usr/bin:/bin /usr/bin/omarchy plugin enable hancore.omaq \
+    PATH=/usr/bin:/bin /usr/bin/omarchy plugin enable io.zet.harbor \
       --section "$section" >"$enable_tmp/stdout" 2>"$enable_tmp/stderr"
   else
-    PATH=/usr/bin:/bin /usr/bin/omarchy plugin enable hancore.omaq \
+    PATH=/usr/bin:/bin /usr/bin/omarchy plugin enable io.zet.harbor \
       >"$enable_tmp/stdout" 2>"$enable_tmp/stderr"
   fi
   enable_status=$?
@@ -176,14 +176,14 @@ if [ "$root" = "$live_root" ]; then
   trap - EXIT HUP INT TERM
 
   # Helper writes may leave a watched-tree QML reload in flight, while plugin
-  # enablement reactively activates OmaQ's Loaders. Do not force a second shell
+  # enablement reactively activates Harbor's Loaders. Do not force a second shell
   # exit while they may still be finalizing IpcHandler registration:
   # Quickshell can crash there.
   ready=0
   attempt=0
   while [ "$attempt" -lt 200 ]; do
     if OMARCHY_SHELL_IPC_TIMEOUT=0.2s PATH=/usr/bin:/bin \
-        /usr/bin/omarchy-shell hancore.omaq status >/dev/null 2>&1 &&
+        /usr/bin/omarchy-shell io.zet.harbor status >/dev/null 2>&1 &&
         helper_is_current; then
       ready=1
       break
@@ -194,10 +194,10 @@ if [ "$root" = "$live_root" ]; then
   [ "$ready" -eq 1 ] || {
     PATH=/usr/bin:/bin /usr/bin/python3 -IB \
       "$helper_runtime" status --root "$root" --json || true
-    fail "OmaQ was enabled, but its plugin IPC and helper did not become ready"
+    fail "Harbor was enabled, but its plugin IPC and helper did not become ready"
   }
   if ! PATH=/usr/bin:/bin /usr/bin/python3 -I "$root/cli/omaq.py" --link; then
-    printf '%s\n' "omaq-connect: command not linked; run $root/cli/omaq.py --link" >&2
+    printf '%s\n' "harbor-connect: command not linked; run $root/cli/omaq.py --link" >&2
   fi
   printf 'source: installed (%s)\n' "$head"
   printf 'helper: current\n'

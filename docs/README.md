@@ -1,4 +1,4 @@
-# OmaQ documentation
+# Harbor documentation
 
 ## User documentation
 

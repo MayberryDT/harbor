@@ -216,11 +216,11 @@ def main():
         if not term.wait_for(":connect <name>", 5):
             fail(":help did not list the commands")
         for _ in range(4):
-            if "Quit OmaQ" in term.text():
+            if "Quit Harbor" in term.text():
                 break
             term.send(b"\x1b[6~")
             term.pump(0.4)
-        if "Quit OmaQ" not in term.text() or ":qa" in term.screen()[-1]:
+        if "Quit Harbor" not in term.text() or ":qa" in term.screen()[-1]:
             fail(":help did not list the commands")
         term.send("\x1b")
         term.pump(0.3)

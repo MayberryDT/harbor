@@ -52,7 +52,7 @@ class Link:
                 continue
             if isinstance(event, dict):
                 events.append(event)
-        if len(self.buf) > (1 << 20):
+        if len(self.buf) > (8 << 20):
             self.buf = b""
         return events
 

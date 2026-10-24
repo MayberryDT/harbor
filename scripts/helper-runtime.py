@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect, back up, and optionally activate OmaQ's locally built helper."""
+"""Inspect, back up, and optionally activate Harbor's locally built helper."""
 
 import argparse
 from dataclasses import dataclass
@@ -365,7 +365,7 @@ def describe(state: str, available: str, runtime=None, detail=None):
     if JSON_OUTPUT:
         print(json.dumps(value, sort_keys=True))
         return
-    print(f"OmaQ helper: {state.replace('-', ' ')}")
+    print(f"Harbor helper: {state.replace('-', ' ')}")
     if runtime:
         print(f"  Running:   {runtime.digest} (Protocol {runtime.protocol}, PID {runtime.pid})")
     if available:

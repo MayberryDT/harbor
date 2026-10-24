@@ -37,7 +37,7 @@ class SourceUpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "manifest.json").write_text(
-                '{"id":"hancore.omaq","id":"other"}\n', encoding="utf-8"
+                '{"id":"io.zet.harbor","id":"other"}\n', encoding="utf-8"
             )
             with self.assertRaisesRegex(MODULE.UpdateError, "duplicate JSON key"):
                 MODULE.validate_manifest(root)
@@ -1398,7 +1398,7 @@ class SourceUpdateTests(unittest.TestCase):
                 ["git", "-C", str(source), "config", "user.email", "test@example.invalid"],
                 check=True,
             )
-            (source / "manifest.json").write_text(json.dumps({"id": "hancore.omaq"}) + "\n",
+            (source / "manifest.json").write_text(json.dumps({"id": "io.zet.harbor"}) + "\n",
                                                    encoding="utf-8")
             subprocess.run(["git", "-C", str(source), "add", "manifest.json"], check=True)
             subprocess.run(["git", "-C", str(source), "commit", "-m", "fixture"], check=True,
@@ -1454,8 +1454,8 @@ class SourceUpdateTests(unittest.TestCase):
             )
             manifest = {
                 "schemaVersion": 1,
-                "id": "hancore.omaq",
-                "name": "OmaQ",
+                "id": "io.zet.harbor",
+                "name": "Harbor",
                 "version": "test",
                 "kinds": ["bar-widget"],
                 "entryPoints": {"barWidget": "Panel.qml"},

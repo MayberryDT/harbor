@@ -1,24 +1,24 @@
-# Install, update, or remove OmaQ
+# Install, update, or remove Harbor
 
 This guide covers source installation, shell-off updates, helper status, rollback, removal, retained data, and optional package cleanup.
 
-[![OmaQ panel after installation](images/guide/01-panel-home.png)](images/guide/01-panel-home.png)
+[![Harbor panel after installation](images/guide/01-panel-home.png)](images/guide/01-panel-home.png)
 
-## Install OmaQ
+## Install Harbor
 
 > [!IMPORTANT]
-> OmaQ is not published in the Arch User Repository (AUR) yet. Until an OmaQ package is available, install it through Omarchy's normal plugin command.
+> Harbor is not published in the Arch User Repository (AUR) yet. Until a Harbor package is available, install it through Omarchy's normal plugin command.
 
 Run the installation as your desktop user while the Omarchy shell is running and the session is unlocked:
 
 ```bash
-omarchy plugin add https://github.com/HANCORE-linux/OmaQ.git --yes &&
-~/.config/omarchy/plugins/hancore.omaq/install.sh --yes
+omarchy plugin add https://github.com/MayberryDT/harbor.git --yes &&
+~/.config/omarchy/plugins/io.zet.harbor/install.sh --yes
 ```
 
-Review the exact repository URL before running the command: `--yes` suppresses Omarchy's clone and enable questions, so the normal path leaves the checkout disabled for the next step. Omarchy clones, validates, and installs that checkout. The installed `install.sh` verifies that OmaQ is a disabled third-party bar widget before installing packages; it refuses a stale shell-layout reference that enabled OmaQ during discovery. It then installs the required dependencies through `omarchy pkg add`, builds the Signal-enabled helper, and enables OmaQ. Helper writes may leave a watched-tree reload in flight, while enablement reactively activates the plugin. The installer therefore does not force a second `omarchy restart shell` while asynchronous plugin Loaders may still be finalizing `IpcHandler` registration. It succeeds only after activation exposes working OmaQ IPC and matching available and running helper images. It accepts `--section left`, `center`, or `right`; omission uses the manifest's `right` default. Keeping enablement inside `install.sh` ensures the helper exists before activation and avoids treating an interrupted `omarchy plugin add --enable` response as a failed clone. The bar may reload briefly during activation.
+Review the exact repository URL before running the command: `--yes` suppresses Omarchy's clone and enable questions, so the normal path leaves the checkout disabled for the next step. Omarchy clones, validates, and installs that checkout. The installed `install.sh` verifies that Harbor is a disabled third-party bar widget before installing packages; it refuses a stale shell-layout reference that enabled Harbor during discovery. It then installs the required dependencies through `omarchy pkg add`, builds the Signal-enabled helper, and enables Harbor. Helper writes may leave a watched-tree reload in flight, while enablement reactively activates the plugin. The installer therefore does not force a second `omarchy restart shell` while asynchronous plugin Loaders may still be finalizing `IpcHandler` registration. It succeeds only after activation exposes working Harbor IPC and matching available and running helper images. It accepts `--section left`, `center`, or `right`; omission uses the manifest's `right` default. Keeping enablement inside `install.sh` ensures the helper exists before activation and avoids treating an interrupted `omarchy plugin add --enable` response as a failed clone. The bar may reload briefly during activation.
 
-A package, build, enable, plugin-IPC, or helper-readiness error stops the command and retains the plugin checkout for inspection. A pre-build enabled-state error must be corrected with `omarchy plugin disable hancore.omaq` before retrying. Use the [update section](#update-omaq) for an existing installation.
+A package, build, enable, plugin-IPC, or helper-readiness error stops the command and retains the plugin checkout for inspection. A pre-build enabled-state error must be corrected with `omarchy plugin disable io.zet.harbor` before retrying. Use the [update section](#update-omaq) for an existing installation.
 
 The normal command uses Omarchy's Git acquisition and therefore trusts the user's Git configuration and environment, including URL rewrites, proxies, credential helpers, and TLS settings. It does not independently prove before execution that the checkout came from public GitHub. Use the following bootstrap when acquisition must ignore user Git configuration, bind a reviewed commit before execution, and enforce resource limits.
 
@@ -198,7 +198,7 @@ if shutil.disk_usage(os.path.dirname(root)).free < 2 * maximum_tree:
     raise SystemExit("State staging has less than 1 GiB free")
 if expected and not re.fullmatch(r"[0-9a-f]{40}", expected):
     raise SystemExit("Expected commit must be complete lowercase 40-hex")
-origin = "https://github.com/HANCORE-linux/OmaQ.git"
+origin = "https://github.com/MayberryDT/harbor.git"
 remote = run(
     [*git, "ls-remote", "--exit-code", origin, "refs/heads/main"], 60
 ).decode("utf-8", "strict").split()
@@ -257,26 +257,26 @@ The bootstrap uses an isolated credential-free home for anonymous public GitHub 
 
 </details>
 
-The external installer used by that bootstrap validates the complete Git checkout, builds the helper outside the monitored plugin tree, stops the shell, and places the checkout with `renameat2(RENAME_NOREPLACE)`. It then restarts the shell, waits for startup discovery, and enables OmaQ once. See the [source installation transaction](stages/safe-source-install.md) for security boundaries and failure recovery.
+The external installer used by that bootstrap validates the complete Git checkout, builds the helper outside the monitored plugin tree, stops the shell, and places the checkout with `renameat2(RENAME_NOREPLACE)`. It then restarts the shell, waits for startup discovery, and enables Harbor once. See the [source installation transaction](stages/safe-source-install.md) for security boundaries and failure recovery.
 
 Verify the plugin and helper after installation:
 
 ```bash
-omarchy plugin validate ~/.config/omarchy/plugins/hancore.omaq
-~/.config/omarchy/plugins/hancore.omaq/scripts/update-helper.sh --status
+omarchy plugin validate ~/.config/omarchy/plugins/io.zet.harbor
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-helper.sh --status
 ```
 
-## Update OmaQ
+## Update Harbor
 
 The supported updater keeps every source fetch and helper build outside the monitored plugin directory. Run it from an installation that already contains the command:
 
 ```bash
-~/.config/omarchy/plugins/hancore.omaq/scripts/update-omaq.sh --yes
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh --yes
 ```
 
-Do not run `omarchy plugin update hancore.omaq --yes` or include OmaQ in an all-plugins `omarchy plugin update --yes` operation. Omarchy's generic updater fast-forwards the source checkout but has no OmaQ lifecycle hook to rebuild and verify the native helper. Use only the OmaQ updater above.
+Do not run `omarchy plugin update io.zet.harbor --yes` or include Harbor in an all-plugins `omarchy plugin update --yes` operation. Omarchy's generic updater fast-forwards the source checkout but has no Harbor lifecycle hook to rebuild and verify the native helper. Use only the Harbor updater above.
 
-The update requires an enabled OmaQ plugin, a clean Git checkout on `main`, the canonical OmaQ `origin`, an unlocked session, and a running Protocol-9-or-newer helper. `XDG_RUNTIME_DIR` and `XDG_STATE_HOME` must resolve outside `~/.config/omarchy/plugins/`. The updater refuses symlinked roots, local source changes, non-fast-forward history, malformed manifests, ambiguous protocol declarations, and a staged QML requirement newer than the running helper.
+The update requires an enabled Harbor plugin, a clean Git checkout on `main`, the canonical Harbor `origin`, an unlocked session, and a running Protocol-9-or-newer helper. `XDG_RUNTIME_DIR` and `XDG_STATE_HOME` must resolve outside `~/.config/omarchy/plugins/`. The updater refuses symlinked roots, local source changes, non-fast-forward history, malformed manifests, ambiguous protocol declarations, and a staged QML requirement newer than the running helper.
 
 ### Bootstrap an older installation
 
@@ -300,7 +300,7 @@ After the command finishes, check NetworkManager and the helper state:
 
 ```bash
 nmcli -t -f STATE general
-~/.config/omarchy/plugins/hancore.omaq/scripts/update-helper.sh --status
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-helper.sh --status
 ```
 
 The helper status reports one of these states:
@@ -331,7 +331,7 @@ A staged build or pre-exchange check leaves the live tree unchanged. A post-exch
 The final activation check can fail after the new tree passed its pre-activation consumer checks. The updater leaves that tree in place because the helper process may already have changed, returns a failure, and never treats an inactive helper as success. Check helper status first. Restore `.prev` if the hashes differ or the error reports an inactive, substituted, protocol-incompatible, or degraded helper:
 
 ```bash
-~/.config/omarchy/plugins/hancore.omaq/scripts/update-omaq.sh \
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh \
   --rollback-helper --yes
 ```
 
@@ -348,12 +348,12 @@ A group-free restart creates a short offline window. In-flight messages become `
 
 </details>
 
-## Remove OmaQ
+## Remove Harbor
 
 Run the verified wrapper:
 
 ```bash
-~/.config/omarchy/plugins/hancore.omaq/scripts/uninstall-omaq.sh
+~/.config/omarchy/plugins/io.zet.harbor/scripts/uninstall-omaq.sh
 ```
 
 When a helper is running, the wrapper binds it to its process, executable, socket, and instance. It removes the plugin only after a correlated group-free shutdown acknowledgment and never uses a signal fallback. When no helper runtime exists, it locks helper startup before removal instead.
@@ -370,7 +370,7 @@ Omarchy deletes a Git-managed plugin directory, including local source changes i
 
 ## Review retained data
 
-After removing the plugin, an interactive wrapper run offers each existing OmaQ directory separately:
+After removing the plugin, an interactive wrapper run offers each existing Harbor directory separately:
 
 - `~/.local/share/omaq/`: identity, contacts, groups, avatars, history, Ratchet state, and managed custom sounds
 - `~/.local/state/omaq/`: identity recovery, preferences, unread state, receipts, surfaces, and journals
@@ -387,11 +387,11 @@ Every destructive answer defaults to No. A confirmed parent is retained when it 
 
 ## Remove unused packages
 
-OmaQ never removes dependency packages automatically because the uninstaller cannot reliably determine whether they were installed for another application. After removal, the wrapper prints this optional command:
+Harbor never removes dependency packages automatically because the uninstaller cannot reliably determine whether they were installed for another application. After removal, the wrapper prints this optional command:
 
 ```bash
 sudo pacman -R toxcore libsignal-protocol-c libpulse libpng libjpeg-turbo libwebp \
   ttf-material-symbols-variable qrencode
 ```
 
-Run it only after confirming that none of those packages predated OmaQ and no other application needs them. `pacman -R` is intentionally used without `-s`: it targets only the listed packages and refuses the complete operation when another installed package requires one. If Pacman reports a dependency conflict, leave the packages installed rather than forcing removal. `zbar` is not an OmaQ installation dependency and is not included.
+Run it only after confirming that none of those packages predated Harbor and no other application needs them. `pacman -R` is intentionally used without `-s`: it targets only the listed packages and refuses the complete operation when another installed package requires one. If Pacman reports a dependency conflict, leave the packages installed rather than forcing removal. `zbar` is not a Harbor installation dependency and is not included.

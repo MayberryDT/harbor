@@ -1,5 +1,6 @@
 #define _DEFAULT_SOURCE
 #include "store.h"
+#include "harbor_transport.h"
 #include "json_io.h"
 
 #include <ctype.h>
@@ -15,7 +16,7 @@
 
 #define ROTATE_BYTES (2 * 1024 * 1024)
 #define UNREAD_STATE_BYTES (1024 * 1024)
-#define STORE_LINE_MAX 16384u
+#define STORE_LINE_MAX HARBOR_EVENT_MAX
 #define GROUP_REACTION_ACTORS_MAX 32
 #define MESSAGE_INDEX_SLOTS 8
 #define MESSAGE_INDEX_BLOOM_BYTES (128u * 1024u)
@@ -389,7 +390,7 @@ static int replace_string_field(const char *line, const char *field_name,
 				const char *value_text, char **out)
 {
 	const char *field, *value, *end;
-	char prefix_text[128], esc[2800];
+	char prefix_text[128], esc[HARBOR_ESC_MAX];
 	char *result;
 	size_t prefix, suffix, n, field_len;
 
@@ -470,7 +471,7 @@ static int append_flag(const char *line, const char *flag, char **out)
 
 static int append_string_field(const char *line, const char *field, const char *value, char **out)
 {
-	char needle[128], esc[2800], *result;
+	char needle[128], esc[HARBOR_ESC_MAX], *result;
 	size_t len, extra;
 
 	if (!line || !field || !value || !out ||
@@ -1541,7 +1542,7 @@ int omaq_store_search(const char *home, const char *conv_id, const char *needle,
 	if (!hit)
 		goto sfail;
 	for (i = 0; i < n; i++) {
-		char text[2800];
+		char text[HARBOR_TEXT_MAX + 1];
 		if (line_text_value(lines[i], text, sizeof(text)) == 0 && ci_has(text, needle))
 			hit[nhit++] = i;
 	}

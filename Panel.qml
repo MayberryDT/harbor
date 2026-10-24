@@ -10,11 +10,11 @@ import Quickshell.Wayland
 import qs.Ui
 import qs.Commons
 import "Model.js" as Model
-import "." as OmaQ
+import "." as Harbor
 
 BarWidget {
   id: root
-  moduleName: "hancore.omaq"
+  moduleName: "io.zet.harbor"
 
   property bool opened: false
   property string redeemDraft: ""
@@ -241,19 +241,19 @@ BarWidget {
     "if [ \"$mode\" = export ]; then\n" +
     "  initial=$downloads/omaq-identity.save\n" +
     "  if command -v zenity >/dev/null 2>&1; then\n" +
-    "    exec zenity --file-selection --save --confirm-overwrite --title='Export OmaQ identity' --filename=\"$initial\" --file-filter='OmaQ identity | *.save'\n" +
+    "    exec zenity --file-selection --save --confirm-overwrite --title='Export Harbor identity' --filename=\"$initial\" --file-filter='Harbor identity | *.save'\n" +
     "  elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "    exec kdialog --getsavefilename \"$initial\" '*.save|OmaQ identity'\n" +
+    "    exec kdialog --getsavefilename \"$initial\" '*.save|Harbor identity'\n" +
     "  elif command -v yad >/dev/null 2>&1; then\n" +
-    "    exec yad --file --save --confirm-overwrite --title='Export OmaQ identity' --filename=\"$initial\"\n" +
+    "    exec yad --file --save --confirm-overwrite --title='Export Harbor identity' --filename=\"$initial\"\n" +
     "  fi\n" +
     "else\n" +
     "  if command -v zenity >/dev/null 2>&1; then\n" +
-    "    exec zenity --file-selection --title='Select OmaQ identity' --file-filter='OmaQ identity | *.save'\n" +
+    "    exec zenity --file-selection --title='Select Harbor identity' --file-filter='Harbor identity | *.save'\n" +
     "  elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "    exec kdialog --getopenfilename \"$HOME\" '*.save|OmaQ identity'\n" +
+    "    exec kdialog --getopenfilename \"$HOME\" '*.save|Harbor identity'\n" +
     "  elif command -v yad >/dev/null 2>&1; then\n" +
-    "    exec yad --file --title='Select OmaQ identity'\n" +
+    "    exec yad --file --title='Select Harbor identity'\n" +
     "  fi\n" +
     "fi\n" +
     "exit 2\n"
@@ -324,9 +324,9 @@ BarWidget {
       SafeText {
         anchors.centerIn: parent
         visible: av.failed || av.path === ""
-        text: OmaQ.MaterialSymbols.glyph("person")
+        text: Harbor.MaterialSymbols.glyph("person")
         color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.72)
-        font.family: OmaQ.MaterialSymbols.family
+        font.family: Harbor.MaterialSymbols.family
         font.pixelSize: Math.round(av.px * 0.64)
         font.variableAxes: ({ "FILL": 0, "wght": 500 })
         renderType: Text.QtRendering
@@ -439,11 +439,11 @@ BarWidget {
         id: buttonIcon
         visible: tokenButton.iconText !== ""
         text: tokenButton.iconFontFamily === "Material Symbols Rounded"
-          ? OmaQ.MaterialSymbols.glyph(tokenButton.iconText) : tokenButton.iconText
+          ? Harbor.MaterialSymbols.glyph(tokenButton.iconText) : tokenButton.iconText
         color: tokenButton.selected || tokenButton.hot || tokenButton.activeFocus
           ? tokenButton.actionColor : tokenButton.foreground
         font.family: tokenButton.iconFontFamily === "Material Symbols Rounded"
-          ? OmaQ.MaterialSymbols.family : tokenButton.iconFontFamily
+          ? Harbor.MaterialSymbols.family : tokenButton.iconFontFamily
         font.pixelSize: tokenButton.iconSize
         anchors.verticalCenter: parent.verticalCenter
       }
@@ -530,10 +530,10 @@ BarWidget {
 
     SafeText {
       anchors.centerIn: parent
-      text: OmaQ.MaterialSymbols.glyph(railIcon.materialIcon)
+      text: Harbor.MaterialSymbols.glyph(railIcon.materialIcon)
       color: railIcon.selected || railHover.hovered || railIcon.activeFocus
         ? railIcon.activeColor : root.dim
-      font.family: OmaQ.MaterialSymbols.family
+      font.family: Harbor.MaterialSymbols.family
       font.pixelSize: Style.font.icon + Style.space(3)
       font.variableAxes: ({ "FILL": railIcon.selected && railIcon.fillSelected ? 1 : 0,
                             "wght": 500 })
@@ -833,17 +833,17 @@ BarWidget {
     if (code === "locked")
       return "Unlock your identity to continue."
     if (code === "unsupported")
-      return "That is not an OmaQ invite."
+      return "That is not a Harbor invite."
     if (code === "helper_down")
-      return "OmaQ is restarting."
+      return "Harbor is restarting."
     if (code === "helper_incompatible")
-      return "OmaQ helper needs to be restarted."
+      return "Harbor helper needs to be restarted."
     if (code === "helper_handshake_pending")
-      return "OmaQ is still restoring queued events."
+      return "Harbor is still restoring queued events."
     if (code === "helper_event_overflow")
       return "Some queued live events were compacted; history was resynchronized."
     if (code === "helper_event_invalid")
-      return "OmaQ received an invalid response from the running helper."
+      return "Harbor received an invalid response from the running helper."
     if (code === "file_failed")
       return "File transfer failed."
     if (code === "avatar_failed")
@@ -859,7 +859,7 @@ BarWidget {
     if (code === "identity_backup_failed")
       return "Could not create a safe identity backup."
     if (code === "runtime_marker_failed")
-      return "Your identity change is saved, but OmaQ could not update its runtime file. Free some disk space, then restart OmaQ; until then, quitting may leave it running."
+      return "Your identity change is saved, but Harbor could not update its runtime file. Free some disk space, then restart Harbor; until then, quitting may leave it running."
     if (code === "identity_backup_cleanup_failed")
       return "An old identity recovery backup could not be removed."
     if (code === "identity_passphrase_required")
@@ -869,17 +869,17 @@ BarWidget {
     if (code === "identity_state_archive_failed")
       return "Could not archive the previous identity's local data."
     if (code === "identity_rollback_failed")
-      return "Identity restore failed. The backup was kept in the OmaQ data folder."
+      return "Identity restore failed. The backup was kept in the Harbor data folder."
     if (code === "identity_missing")
-      return "Your existing OmaQ identity is unavailable. No replacement identity was created. Restore or import the original identity."
+      return "Your existing Harbor identity is unavailable. No replacement identity was created. Restore or import the original identity."
     if (code === "identity_mismatch")
-      return "The active identity does not match OmaQ's protected identity record. No contact state was changed."
+      return "The active identity does not match Harbor's protected identity record. No contact state was changed."
     if (code === "identity_guard_invalid")
-      return "OmaQ could not verify the protected identity state and stopped before creating a replacement."
+      return "Harbor could not verify the protected identity state and stopped before creating a replacement."
     if (code === "identity_recovery_degraded")
       return "Your active identity is saved, but its additional recovery copy could not be updated. Export an identity bundle before relying on automatic recovery."
     if (code === "identity_primary_uncertain")
-      return "OmaQ could not confirm that the latest identity/contact change reached disk. The helper stopped using that identity; restart OmaQ and verify the result before retrying."
+      return "Harbor could not confirm that the latest identity/contact change reached disk. The helper stopped using that identity; restart Harbor and verify the result before retrying."
     if (code === "invite_self")
       return "This invite belongs to your own identity."
     if (code === "contact_exists")
@@ -897,7 +897,7 @@ BarWidget {
     if (code === "direct_state_migration_failed")
       return "Legacy direct-chat state could not be migrated safely."
     if (code === "direct_state_reinvite_required")
-      return "Your OmaQ identity and contacts are intact. Some older direct-chat encryption state was safely archived and requires fresh invites."
+      return "Your Harbor identity and contacts are intact. Some older direct-chat encryption state was safely archived and requires fresh invites."
     return code
   }
 
@@ -963,7 +963,7 @@ BarWidget {
     root.inviteFeedback = "Creating invite…"
     root.inviteFeedbackError = false
     if (!omaq.createInvite(root.inviteActionRequest)) {
-      root.failInviteAction("OmaQ is not ready to create an invite.")
+      root.failInviteAction("Harbor is not ready to create an invite.")
       return false
     }
     inviteActionTimer.restart()
@@ -983,7 +983,7 @@ BarWidget {
     root.inviteFeedback = replaceAfter ? "Revoking old invite…" : "Revoking invite…"
     root.inviteFeedbackError = false
     if (!omaq.revokeInvite(root.inviteActionRequest)) {
-      root.failInviteAction("OmaQ is not ready to revoke this invite.")
+      root.failInviteAction("Harbor is not ready to revoke this invite.")
       return false
     }
     inviteActionTimer.restart()
@@ -1339,7 +1339,7 @@ BarWidget {
     var key = String(action || "")
     if (key !== "unlock" && !omaq.supportsIdentityActions) {
       root.identityFeedbackError = true
-      root.identityFeedback = "Update the local OmaQ helper before changing identity settings."
+      root.identityFeedback = "Update the local Harbor helper before changing identity settings."
       return false
     }
     var selectedPath = String(path || "").trim()
@@ -1397,7 +1397,7 @@ BarWidget {
     passField.text = ""
     unlockField.text = ""
     if (!sent) {
-      root.finishIdentityAction(false, "OmaQ is not ready for that identity action.")
+      root.finishIdentityAction(false, "Harbor is not ready for that identity action.")
       return false
     }
     identityActionTimer.restart()
@@ -1416,7 +1416,7 @@ BarWidget {
     root.identityFeedbackError = false
     root.identityFeedback = root.identityPickerMode === "export"
       ? "Choose where to export the private identity bundle."
-      : "Choose an OmaQ identity bundle."
+      : "Choose a Harbor identity bundle."
     identityPick.running = false
     identityPick.running = true
   }
@@ -1707,7 +1707,7 @@ BarWidget {
     var request = omaq.nextSoundRequest("import")
     if (!omaq.importCustomSound(path, request)) {
       root.soundFeedbackError = true
-      root.soundFeedback = "OmaQ is not ready to import that sound."
+      root.soundFeedback = "Harbor is not ready to import that sound."
       return
     }
     root.soundAction = "import"
@@ -1734,7 +1734,7 @@ BarWidget {
     var request = omaq.nextSoundRequest("remove")
     if (!omaq.removeCustomSound(root.soundRemoveId, request)) {
       root.soundFeedbackError = true
-      root.soundFeedback = "OmaQ is not ready to remove that sound."
+      root.soundFeedback = "Harbor is not ready to remove that sound."
       return
     }
     root.soundAction = "remove"
@@ -1762,7 +1762,7 @@ BarWidget {
   }
 
   function openRepo() {
-    Quickshell.execDetached(["xdg-open", "https://github.com/HANCORE-linux/OmaQ"])
+    Quickshell.execDetached(["xdg-open", "https://github.com/MayberryDT/harbor"])
   }
 
   function openKoFi() {
@@ -1984,7 +1984,7 @@ BarWidget {
       root.inviteActionPending = false
       root.inviteActionMode = ""
       root.inviteActionRequest = ""
-      root.inviteFeedback = "Invite action timed out. Check OmaQ status and try again."
+      root.inviteFeedback = "Invite action timed out. Check Harbor status and try again."
       root.inviteFeedbackError = true
     }
   }
@@ -2007,7 +2007,7 @@ BarWidget {
     interval: 12000
     repeat: false
     onTriggered: {
-      root.soundFeedback = "The sound action is delayed. OmaQ will apply its correlated result after reconnecting."
+      root.soundFeedback = "The sound action is delayed. Harbor will apply its correlated result after reconnecting."
       root.soundFeedbackError = true
     }
   }
@@ -2017,7 +2017,7 @@ BarWidget {
     interval: 20000
     repeat: false
     onTriggered: root.finishIdentityAction(false,
-      "The identity action timed out. Check OmaQ status and try again.")
+      "The identity action timed out. Check Harbor status and try again.")
   }
 
   FileView {
@@ -2150,7 +2150,7 @@ BarWidget {
             root.notificationSoundPath === root.soundRemovePath)
           root.persistSettings({ sound: "off", soundCustomPath: "",
             soundCustomId: "" })
-        root.soundFeedback = "Removed the OmaQ-managed sound copy."
+        root.soundFeedback = "Removed the Harbor-managed sound copy."
         root.soundFeedbackError = false
         root.soundRemoveId = ""
         root.soundRemoveLabel = ""
@@ -2241,7 +2241,7 @@ BarWidget {
     function onReconnectGenerationChanged() {
       if (root.inviteActionPending && root.inviteActionGeneration >= 0 &&
           root.inviteActionGeneration !== Number(omaq.reconnectGeneration || 0))
-        root.failInviteAction("OmaQ restarted before the invite action completed.")
+        root.failInviteAction("Harbor restarted before the invite action completed.")
       if (root.identityPrimaryRequest !== "") {
         root.identityPrimaryRequest = ""
         root.identityPrimaryConfirm = false
@@ -2267,7 +2267,7 @@ BarWidget {
         root.directReinviteClearConfirm = false
       }
       if (root.redeemRequest !== "") {
-        root.redeemFeedback = "OmaQ restarted before the invite result was confirmed. Check your contacts before trying again."
+        root.redeemFeedback = "Harbor restarted before the invite result was confirmed. Check your contacts before trying again."
         root.redeemFeedbackRequest = root.redeemRequest
         root.redeemSafety = ""
         root.redeemRequest = ""
@@ -2370,7 +2370,7 @@ BarWidget {
   }
 
   IpcHandler {
-    target: "hancore.omaq"
+    target: "io.zet.harbor"
     function open(): void { root.open() }
     function close(): void { root.close() }
     function show(): void { root.open() }
@@ -2390,8 +2390,8 @@ BarWidget {
     opticalSize: Style.bar.iconCanvas + Style.space(2)
     anchors.fill: parent
     bar: root.bar
-    text: omaq.incomingCall ? (OmaQ.MaterialSymbols.ready ? "\ue0b0" : "?") : (omaq.pending ? "" : "󰭹")
-    fontFamily: omaq.incomingCall ? OmaQ.MaterialSymbols.family : "monospace"
+    text: omaq.incomingCall ? (Harbor.MaterialSymbols.ready ? "\ue0b0" : "?") : (omaq.pending ? "" : Harbor.MaterialSymbols.glyph("anchor"))
+    fontFamily: omaq.incomingCall || !omaq.pending ? Harbor.MaterialSymbols.family : "monospace"
     active: omaq.incomingCall || omaq.pending
     activeColor: omaq.pending && !omaq.incomingCall
       ? (root.systemColors[1] || root.urgent)
@@ -2401,7 +2401,7 @@ BarWidget {
       ? "Incoming call"
       : (omaq.pending
         ? (omaq.pendingGroup ? "Group invite received" : "Friend request received")
-        : "OmaQ")
+        : "Harbor")
     onPressed: function(b) {
       if (b === Qt.RightButton)
         return
@@ -2869,7 +2869,7 @@ BarWidget {
                     if (root.nicknameSubmitPending) {
                       nicknameSubmitTimer.restart()
                     } else {
-                      root.nicknameFeedback = "OmaQ is not ready to update the nickname."
+                      root.nicknameFeedback = "Harbor is not ready to update the nickname."
                       root.nicknameFeedbackError = true
                       root.nicknameRequest = ""
                     }
@@ -3064,7 +3064,7 @@ BarWidget {
               height: Style.space(30)
               borderless: true
               accent: root.systemColors[3] || root.controlAccent
-              tooltipText: "Open OmaQ on GitHub"
+              tooltipText: "Open Harbor on GitHub"
               accessibleName: tooltipText
               focusable: true
               horizontalPadding: Style.space(2)
@@ -3680,9 +3680,9 @@ BarWidget {
                     id: activeGroupIcon
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    text: OmaQ.MaterialSymbols.glyph("groups")
+                    text: Harbor.MaterialSymbols.glyph("groups")
                     color: root.systemColors[3] || root.controlAccent
-                    font.family: OmaQ.MaterialSymbols.family
+                    font.family: Harbor.MaterialSymbols.family
                     font.pixelSize: Style.font.icon
                     font.variableAxes: ({ "FILL": activeGroupDelegate.activeFocus ? 1 : 0,
                                           "wght": 500 })
@@ -3914,7 +3914,7 @@ BarWidget {
             SafeText {
               visible: !omaq.supportsCustomSounds
               width: parent.width
-              text: "Update the local OmaQ helper to import or remove custom sounds."
+              text: "Update the local Harbor helper to import or remove custom sounds."
               color: root.urgent
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -3945,7 +3945,7 @@ BarWidget {
               visible: root.soundRemoveConfirm
               width: parent.width
               text: "Remove " + root.soundRemoveLabel +
-                " from OmaQ? The original source file stays unchanged."
+                " from Harbor? The original source file stays unchanged."
               color: root.urgent
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
@@ -4005,7 +4005,7 @@ BarWidget {
 
             SafeText {
               width: parent.width
-              text: "OmaQ could not confirm whether the latest identity, contact, or group change reached disk before restarting. Messaging and mutations are paused. Review your nickname and contacts first; group recovery stays paused and is reconciled only after confirmation."
+              text: "Harbor could not confirm whether the latest identity, contact, or group change reached disk before restarting. Messaging and mutations are paused. Review your nickname and contacts first; group recovery stays paused and is reconciled only after confirmation."
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
@@ -4093,7 +4093,7 @@ BarWidget {
 
             SafeText {
               width: parent.width
-              text: "Your OmaQ identity and contact list are intact. Older direct-chat encryption state could not be safely assigned to current contacts and was archived. Remove affected contacts on both devices, exchange one fresh invite, and verify that the new chat works."
+              text: "Your Harbor identity and contact list are intact. Older direct-chat encryption state could not be safely assigned to current contacts and was archived. Remove affected contacts on both devices, exchange one fresh invite, and verify that the new chat works."
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
@@ -4103,7 +4103,7 @@ BarWidget {
             SafeText {
               visible: !omaq.supportsDirectRecovery
               width: parent.width
-              text: "Update the local OmaQ helper before marking recovery complete. Existing contacts remain available."
+              text: "Update the local Harbor helper before marking recovery complete. Existing contacts remain available."
               color: root.urgent
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
@@ -4285,7 +4285,7 @@ BarWidget {
                   if (omaq.answerCall(omaq.lastCallConv, omaq.lastCallKey)) {
                     root.callFeedback = ""
                     panelCallFeedbackTimer.stop()
-                    OmaQ.CallTone.stopAll()
+                    Harbor.CallTone.stopAll()
                   } else {
                     root.callFeedback = "Call control unavailable"
                     panelCallFeedbackTimer.restart()
@@ -4303,7 +4303,7 @@ BarWidget {
                   if (omaq.stopCall(omaq.lastCallConv, omaq.lastCallKey)) {
                     root.callFeedback = ""
                     panelCallFeedbackTimer.stop()
-                    OmaQ.CallTone.stopAll()
+                    Harbor.CallTone.stopAll()
                   } else {
                     root.callFeedback = "Call control unavailable"
                     panelCallFeedbackTimer.restart()
@@ -4564,7 +4564,7 @@ BarWidget {
                       root.redeemFeedbackRequest = request
                       root.redeemFeedback = "Checking invite…"
                     } else {
-                      root.redeemFeedback = "OmaQ is not ready to check this invite."
+                      root.redeemFeedback = "Harbor is not ready to check this invite."
                     }
                   } else {
                     root.redeemFeedback = root.errorText("unsupported")
@@ -5044,7 +5044,7 @@ BarWidget {
               SafeText {
                 visible: root.moreSection === "identity" && !omaq.supportsIdentityActions
                 width: parent.width
-                text: "Update the local OmaQ helper before changing identity settings. Existing identity and contacts remain available."
+                text: "Update the local Harbor helper before changing identity settings. Existing identity and contacts remain available."
                 color: root.urgent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall

@@ -29,10 +29,10 @@ def ours(target):
         return False
     root = os.path.dirname(os.path.dirname(target))
     if not os.path.exists(target):
-        return os.path.basename(root) == "hancore.omaq"
+        return os.path.basename(root) == "io.zet.harbor"
     try:
         with open(os.path.join(root, "manifest.json"), encoding="utf-8") as f:
-            return json.load(f).get("id") == "hancore.omaq"
+            return json.load(f).get("id") == "io.zet.harbor"
     except (OSError, ValueError, AttributeError):
         return False
 
@@ -42,7 +42,7 @@ def install_link():
     target = os.path.realpath(__file__)
     if os.path.lexists(path):
         if not os.path.islink(path) or not ours(os.readlink(path)):
-            print("%s: %s exists and is not OmaQ's; left unchanged" % (COMMAND, path), file=sys.stderr)
+            print("%s: %s exists and is not Harbor's; left unchanged" % (COMMAND, path), file=sys.stderr)
             return 1
         if os.readlink(path) == target:
             print("%s: %s is current" % (COMMAND, path))
@@ -64,7 +64,7 @@ def remove_link():
     if not os.path.islink(path):
         return 0
     if not ours(os.readlink(path)):
-        print("%s: %s is not OmaQ's; left unchanged" % (COMMAND, path), file=sys.stderr)
+        print("%s: %s is not Harbor's; left unchanged" % (COMMAND, path), file=sys.stderr)
         return 1
     os.unlink(path)
     print("%s: removed %s" % (COMMAND, path))
@@ -74,8 +74,8 @@ def remove_link():
 def main(argv):
     if any(a in ("-h", "--help") for a in argv):
         print("usage: %s [friend]\n       %s --link | --unlink\n\n"
-              "Open the OmaQ chat in this terminal, optionally with that friend.\n"
-              "--link creates ~/.local/bin/%s; --unlink removes it if it is OmaQ's." % (COMMAND, COMMAND, COMMAND))
+              "Open the Harbor chat in this terminal, optionally with that friend.\n"
+              "--link creates ~/.local/bin/%s; --unlink removes it if it is Harbor's." % (COMMAND, COMMAND, COMMAND))
         return 0
     if argv == ["--link"]:
         return install_link()

@@ -1,16 +1,16 @@
 name: Bug report
-description: Report reproducible incorrect behavior in OmaQ
+description: Report reproducible incorrect behavior in Harbor
 title: "[Bug] "
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve OmaQ. Search existing issues first and remove private identities, contacts, messages, invitation links, safety codes, and machine-specific secrets from everything you submit.
+        Thanks for helping improve Harbor. Search existing issues first and remove private identities, contacts, messages, invitation links, safety codes, and machine-specific secrets from everything you submit.
 
   - type: input
     id: version
     attributes:
-      label: OmaQ version or commit
+      label: Harbor version or commit
       description: Find the version in manifest.json. Add the commit when testing an unreleased build.
       placeholder: "0.9.0-beta.2 or commit SHA"
     validations:

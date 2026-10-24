@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define OMAQ_FILE_MAX (8u * 1024u * 1024u)
+#define OMAQ_FILE_MAX (1024u * 1024u * 1024u)
 #define OMAQ_FILE_NAME_MAX 128
 #define OMAQ_FILE_ID_MAX 40
 

@@ -1,110 +1,106 @@
-<h1 align="center">
-  <img src="assets/OmaQ_Final.png" alt="OmaQ" width="640">
-</h1>
+# Harbor
 
-<p align="center">
-  OmaQ is invite-only chat for the Omarchy bar: no account, phone number, or public user search. Create your identity locally, then connect with a one-time private invitation link or QR code.
-</p>
+![Harbor — private chat for Omarchy](docs/images/harbor-cover.png)
 
-## Security
+Private, invite-only chat for your Omarchy desktop. Send messages, share files and make voice calls without an account or phone number.
 
-Tox encrypts transport end to end, and direct text messages add the Signal Double Ratchet. OmaQ disables direct UDP discovery and hole punching, so contacts do not receive each other's IP addresses.
+Harbor is a fork of [OmaQ by hancore](https://github.com/HANCORE-linux/OmaQ). It keeps the compact native interface and adds room for longer messages and larger attachments.
 
-OmaQ runs no servers and has no operator access to your identity, contacts, or messages. Public Tox bootstrap and relay nodes can forward encrypted packets but cannot read message contents. Local filesystem permissions protect Ratchet state, avatars, receipts, preferences, and chat history that are not covered by the optional `tox.save` passphrase.
+## What you can do
 
-Use OmaQ only for lawful private communication with people you trust.
+Harbor gives you:
 
-<details>
-<summary>How OmaQ messages travel</summary>
+- direct and group chats, with replies, edits, reactions and message search
+- floating chat windows that follow your active Omarchy theme
+- direct voice calls, file transfers and inline images
+- a terminal client, `harbor-connect`, that shares your desktop identity and history
+- private invitation links and QR codes, with no public user directory
 
-<p align="center">
-  <img src="docs/images/omaq-message-flow.png" alt="How OmaQ messages travel">
-</p>
+Harbor supports messages up to 64 KiB, direct files up to 1 GiB and inline images up to 64 MiB. Group attachments retain their separate limits. Both people need Harbor for expanded payloads.
 
-</details>
+## Keep your OmaQ contacts
 
-## Bar plugin and terminal client
+Harbor can exchange ordinary messages with OmaQ clients. Existing invitation links still work.
 
-<table>
-  <tr>
-    <th width="50%">Bar plugin</th>
-    <th width="50%">Terminal client</th>
-  </tr>
-  <tr>
-    <td align="center"><a href="docs/images/guide/01-panel-home.png"><img src="docs/images/guide/01-panel-home.png" alt="OmaQ panel in the Omarchy bar" width="320"></a></td>
-    <td align="center"><a href="docs/images/guide/38-terminal-overview.png"><img src="docs/images/guide/38-terminal-overview.png" alt="omaq-connect with two chats side by side" width="100%"></a></td>
-  </tr>
-  <tr>
-    <td valign="top">The panel in the Omarchy bar, with floating chat windows, notifications, groups, voice calls, images, reactions, and search.</td>
-    <td valign="top"><code>omaq-connect</code> in any terminal, with direct chats in split panes, invitations, files, and emoji. <code>:help</code> lists every command and key.</td>
-  </tr>
-</table>
+On the same machine, Harbor uses your existing OmaQ identity, contacts and history. Disable the OmaQ plugin before enabling Harbor. Its detached helper may keep running after the widget closes. Finish active calls and transfers, then use the helper’s guarded shutdown or activation flow before starting Harbor. Harbor requires protocol 17 and will refuse an older running helper. Do not force-stop a helper with pending sends or private groups.
 
-Use either one or both. They share one identity, contact list, and history.
+Run one helper for that profile; do not copy a live identity between machines.
 
-The terminal client does not need the bar; it starts OmaQ's helper itself. To use only the terminal, run `omarchy plugin disable hancore.omaq` after installing. The updater needs the plugin enabled, so run `omarchy plugin enable hancore.omaq` before an update.
+The plugin is called `io.zet.harbor`. The helper, invitation scheme and private data directories retain their `omaq` names for compatibility.
 
-While the bar runs, quitting the terminal client changes nothing. Once the bar is disabled, quitting takes you offline from the next login on, unless you belong to a private group. After updating an older installation, create the command once with `~/.config/omarchy/plugins/hancore.omaq/cli/omaq.py --link`.
-
-## Install
+## Install on Omarchy
 
 ```bash
-omarchy plugin add https://github.com/HANCORE-linux/OmaQ.git --yes &&
-~/.config/omarchy/plugins/hancore.omaq/install.sh --yes
+omarchy plugin add https://github.com/MayberryDT/harbor.git --yes &&
+~/.config/omarchy/plugins/io.zet.harbor/install.sh --yes
 ```
 
-`install.sh` installs dependencies, builds the helper, enables OmaQ in the bar, and creates the `omaq-connect` command. Pass `--section left` or `--section center` to change the bar section. Other Linux distributions are not supported yet.
+The installer installs dependencies, builds the native helper, adds Harbor to your bar and creates `harbor-connect`. Read the [installation guide](docs/INSTALLATION.md) before replacing an existing OmaQ installation.
 
-If a successful install reports a current helper but OmaQ is still absent, refresh the shell:
+Other Linux distributions are not currently supported.
+
+## Start a conversation
+
+1. Open Harbor using the anchor icon in your bar.
+2. Choose Invite and share the private link with someone you trust.
+3. Ask them to redeem the link in Harbor or a compatible OmaQ client.
+4. Review and accept the incoming request.
+5. Open the contact to start chatting.
+
+Use the safety code to compare identities through another trusted channel. Keep invitation links private.
+
+To chat from a terminal, run:
 
 ```bash
-omarchy restart shell
+harbor-connect
 ```
 
-## Update
+Type `:help` for commands and keyboard shortcuts. The terminal and bar share one local helper.
+
+## Privacy and its limits
+
+Direct text messages use the Signal Double Ratchet over encrypted Tox transport. Groups use Tox encrypted group transport. Direct files use Tox transfers.
+
+Harbor disables UDP discovery and hole punching. Connections use TCP relays, so contacts do not receive each other’s IP addresses. Public bootstrap and relay nodes still handle network connections and metadata.
+
+Harbor has no account service or telemetry. Your identity and history stay on your device. Local history is not an encrypted vault: filesystem permissions protect data outside the optional Tox-save passphrase.
+
+Read the [security guide](docs/SECURITY.md) before relying on Harbor for sensitive conversations.
+
+## Current release scope
+
+This release focuses on local desktop chat. Simultaneous devices, synchronized conversations, an optional encrypted mailbox and recovery backups are development work, not supported release features.
+
+Expanded transfers need Harbor at both ends. Pending expanded transport queues do not survive a helper restart. A queued message is not a delivered message.
+
+The [fork verification notes](docs/HARBOR.md) record the tested helper and repeatable network checks. Testing covered 64 KiB messages, a 12 MiB file and a 4K image. The configured 1 GiB file limit was not tested with a full-size transfer.
+
+## Update or remove Harbor
+
+Use the helper-aware updater so the interface and native helper stay together:
 
 ```bash
-~/.config/omarchy/plugins/hancore.omaq/scripts/update-omaq.sh --yes
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh --yes
 ```
 
-Do not update OmaQ with `omarchy plugin update`, including the all-plugins form. It updates the checkout without rebuilding the native helper. When needed, the updater builds outside the monitored plugin tree and verifies the result; the [installation lifecycle](docs/INSTALLATION.md) explains the details.
+Do not use `omarchy plugin update` for Harbor. See the [installation lifecycle](docs/INSTALLATION.md) for update and recovery details.
 
-After an `activated` or `current` result, refresh the shell only if the interface has not reappeared:
+To remove the plugin:
 
 ```bash
-omarchy restart shell
+~/.config/omarchy/plugins/io.zet.harbor/scripts/uninstall-omaq.sh
 ```
 
-## Uninstall
+The uninstaller asks separately before removing personal data. Keeping it is the default.
 
-```bash
-~/.config/omarchy/plugins/hancore.omaq/scripts/uninstall-omaq.sh
-```
+## Documentation and credits
 
-It asks about each remaining OmaQ data directory, with No as the default; `--yes` keeps all data. It also removes the `omaq-connect` command. Dependency packages are never removed automatically.
-
-<details>
-<summary><strong>Project independence and lawful use</strong></summary>
-
-OmaQ is general-purpose software intended for lawful use. This policy adds no restrictions to the open-source licenses.
-
-The project answers lawful requests from public authorities truthfully, including when it does not possess the requested data. OmaQ operates no service and cannot provide identities, contacts, messages, or history stored only on your devices.
-
-The project neither cooperates with resellers nor offers reseller, original equipment manufacturer (OEM), white-label, or exclusive distribution arrangements. This policy neither limits open-source redistribution rights nor implies project affiliation or endorsement.
-
-OmaQ keeps one codebase and all security-relevant changes public and reviewable. The project offers no private, privileged, selectively weakened, or organization-specific builds, including for public authorities, companies, or resellers.
-
-</details>
-
-## Documentation
-
-- [Illustrated user guide](docs/USER-GUIDE.md), including the [terminal client](docs/USER-GUIDE.md#chat-from-the-terminal)
-- [Installation lifecycle](docs/INSTALLATION.md)
+- [User guide](docs/USER-GUIDE.md)
+- [Installation and updates](docs/INSTALLATION.md)
 - [Security and privacy](docs/SECURITY.md)
-- [Current status](docs/CURRENT.md)
-- [Documentation index](docs/README.md)
-- [Third-party components](THIRD_PARTY.md)
+- [Fork changes and verification](docs/HARBOR.md)
+- [Third-party components and artwork](THIRD_PARTY.md)
 
-## License
+Harbor builds on OmaQ by hancore and its contributors. This fork is independent and is not an upstream-endorsed release. The cover is an AI-generated illustration, not a screenshot.
 
-The QML plugin is licensed under the [MIT License](LICENSE.MIT). OmaQ's helper source is GPL-3.0-or-later; the distributed helper binary is [GPL-3.0-only](LICENSE.GPL-3) because it also links to `libsignal-protocol-c`. See [Third-party components](THIRD_PARTY.md) for dependency and asset licenses.
+The QML plugin uses the [MIT License](LICENSE.MIT). Helper source is GPL-3.0-or-later; the distributed helper binary is [GPL-3.0-only](LICENSE.GPL-3) because it links to `libsignal-protocol-c`. Asset and dependency terms are listed in [Third-party components](THIRD_PARTY.md).

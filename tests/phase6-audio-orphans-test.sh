@@ -62,13 +62,13 @@ live_sink="omaq_p6_$$_out_b"
 near_sink="omaq_p6_${owner}_cap_c"
 stale_module=$(pactl load-module module-null-sink \
 	sink_name="$stale_sink" \
-	sink_properties=device.description=OmaQ-Call-Orphan-Test)
+	sink_properties=device.description=Harbor-Call-Orphan-Test)
 live_module=$(pactl load-module module-null-sink \
 	sink_name="$live_sink" \
-	sink_properties=device.description=OmaQ-Call-Live-Test)
+	sink_properties=device.description=Harbor-Call-Live-Test)
 near_module=$(pactl load-module module-null-sink \
 	sink_name="$near_sink" \
-	sink_properties=device.description=OmaQ-Call-Near-Match-Test)
+	sink_properties=device.description=Harbor-Call-Near-Match-Test)
 
 if command -v wpctl >/dev/null 2>&1 &&
    wpctl status -n 2>/dev/null |

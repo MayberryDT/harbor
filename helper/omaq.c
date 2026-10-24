@@ -58,9 +58,9 @@
 #include <unistd.h>
 
 #define MAX_CLIENTS 8
-#define CLIENT_OUT_MAX (OMAQ_JSON_LINE_MAX * 128u)
+#define CLIENT_OUT_MAX (8u * 1024u * 1024u)
 #ifndef OMAQ_PROTOCOL_VERSION
-#define OMAQ_PROTOCOL_VERSION 16
+#define OMAQ_PROTOCOL_VERSION 17
 #endif
 #if OMAQ_PROTOCOL_VERSION >= 15
 #define OMAQ_HISTORY_CLEAR_VERSION 2
@@ -2448,7 +2448,7 @@ static void emit_message_event_kind(const char *conversation, const char *id,
 				     int64_t timestamp)
 {
 	char esc_conv[128], esc_id[128], esc_reply[128], esc_request[512],
-		esc_text[2800], key_field[96], ev[5000];
+		esc_text[HARBOR_ESC_MAX], key_field[96], ev[HARBOR_EVENT_MAX];
 	int has_id, has_reply, has_request, is_attachment, written;
 
 	if (!conversation || !text || !dir || timestamp < 0 ||
@@ -2516,7 +2516,7 @@ static void emit_group_message_event(const char *conversation, const char *id,
 				     const char *sender, int64_t timestamp)
 {
 	char esc_conv[128], esc_id[128], esc_reply[128], esc_sender[512],
-		esc_text[2800], ev[4200];
+		esc_text[HARBOR_ESC_MAX], ev[HARBOR_EVENT_MAX];
 	int has_reply, written;
 
 	if (!conversation || !id || !text || !sender || timestamp <= 0 ||
@@ -2695,7 +2695,7 @@ static void emit_group_invite_terminal(const omaq_op *op, const char *code)
 #ifdef HAVE_TOX
 static void emit_message_update(const char *conversation, const char *id, const char *text, int deleted)
 {
-	char esc_conv[128], esc_id[128], esc_text[2800], key_field[96], ev[3300];
+	char esc_conv[128], esc_id[128], esc_text[HARBOR_ESC_MAX], key_field[96], ev[HARBOR_EVENT_MAX];
 
 	if (!conversation || !id || !text ||
 	    omaq_json_escape(conversation, esc_conv, sizeof(esc_conv)) != 0 ||
@@ -2846,7 +2846,7 @@ static void emit_receipt_failed(const char *conversation, const char *id,
 static int send_message_action_wire(uint32_t friend, const char *conversation,
 				      const char *id, const char *text, int deleted)
 {
-	char plain[3200], wire[3600];
+	char plain[HARBOR_PLAIN_MAX + 1], wire[HARBOR_WIRE_MAX + 1];
 
 	if (!g_tox || !conversation || !id)
 		return -1;
@@ -2875,7 +2875,7 @@ static int send_message_reaction_wire(uint32_t friend, const char *conversation,
 
 static int send_group_invite_wire(uint32_t friend, const char *url)
 {
-	char plain[OMAQ_URL_MAX + 8], wire[3600];
+	char plain[OMAQ_URL_MAX + 8], wire[HARBOR_WIRE_MAX + 1];
 
 	if (!g_tox || !g_ratchet || !url ||
 	    snprintf(plain, sizeof(plain), "OQGI1|%s", url) >= (int)sizeof(plain) ||
@@ -3694,7 +3694,7 @@ static void retry_receipt_outbox(void)
 static int send_message_action(uint32_t friend, const char *conversation,
 			       const char *id, const char *text, int deleted)
 {
-	char plain[3200];
+	char plain[HARBOR_PLAIN_MAX + 1];
 
 	if (!g_tox || !conversation || !id)
 		return -1;
@@ -5698,7 +5698,7 @@ static void hook_gmsg(void *ud, uint32_t gnum, uint32_t peer,
 		      const uint8_t *message, size_t length)
 {
 	char gid[OMAQ_GROUP_ID_MAX], peer_from[96], sender[OMAQ_GROUP_MEMBER_KEY_HEX + 1],
-		mid[97], wire_id[97], wire_reply[97], wire_text[1400], text_buffer[1400];
+		mid[97], wire_id[97], wire_reply[97], wire_text[HARBOR_PLAIN_MAX + 1], text_buffer[HARBOR_PLAIN_MAX + 1];
 	const char *text;
 	const char *display;
 	int has_wire_id = 0;
@@ -5802,7 +5802,7 @@ static void hook_gmsg(void *ud, uint32_t gnum, uint32_t peer,
 		return;
 	}
 	if (text && strncmp(text, "OQE1|", 5) == 0) {
-		char action_id[80], action_text[1400];
+		char action_id[80], action_text[HARBOR_PLAIN_MAX + 1];
 		if (strlen(sender) == 64 &&
 		    omaq_message_edit_wire_unpack(text, action_id, sizeof(action_id), action_text,
 					  sizeof(action_text)) == 0 &&
@@ -6055,7 +6055,7 @@ static void hook_gpeer(void *ud, uint32_t gnum, uint32_t peer, int joined, int r
 static void hook_msg(void *ud, uint32_t friend, const char *text)
 {
 	char conv[16], state_conv[OMAQ_DIRECT_STATE_ID_MAX];
-	char mid[97], wire_id[97], wire_reply[97], wire_text[1400];
+	char mid[97], wire_id[97], wire_reply[97], wire_text[HARBOR_PLAIN_MAX + 1];
 	char receipt_id[97], receipt_state[16], reaction_id[97], reaction_emoji[32];
 	const char *display = text;
 	int has_wire_id = 0;
@@ -6268,7 +6268,7 @@ static void hook_msg(void *ud, uint32_t friend, const char *text)
 		return;
 	}
 	if (text && strncmp(text, "OQE1|", 5) == 0) {
-		char action_id[80], action_text[1400];
+		char action_id[80], action_text[HARBOR_PLAIN_MAX + 1];
 		if (omaq_message_edit_wire_unpack(text, action_id, sizeof(action_id), action_text, sizeof(action_text)) == 0 &&
 		    omaq_control_rate_allow(&g_direct_control_rate, 'e', friend, state_conv,
 					    (int64_t)time(NULL)) == 0 &&
@@ -10555,6 +10555,15 @@ static int helper_shutdown_group_state(int *groups)
 static void begin_helper_shutdown(int owner_fd, const char *escaped_request)
 {
 	char event[768];
+#ifdef HAVE_TOX
+	if (omaq_tox_send_pending(g_tox)) {
+		snprintf(event, sizeof(event),
+			 "{\"event\":\"helper.shutdown_blocked\",\"instance\":\"%s\",\"request\":\"%s\",\"reason\":\"pending_messages\",\"groups\":0}",
+			 g_instance_id, escaped_request);
+		emit(event);
+		return;
+	}
+#endif
 	int queued = 0;
 	int64_t now = monotonic_millis();
 
@@ -10591,7 +10600,7 @@ static int send_direct_text_now(uint32_t friend, const char *conversation,
 				const char *state_conversation, const char *request,
 				const char *reply, const char *text)
 {
-	char packed[3200], wire[3600], mid[64];
+	char packed[HARBOR_PLAIN_MAX + 1], wire[HARBOR_WIRE_MAX + 1], mid[64];
 	int64_t timestamp;
 	int send_rc;
 
@@ -13059,7 +13068,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 		if (g_tox && op->text[0]) {
 			const char *cid = op->conversation[0] ? op->conversation : "0";
 			if (cid[0] == 'g') {
-				char mid[64], packed[3200];
+				char mid[64], packed[HARBOR_PLAIN_MAX + 1];
 				int group_rc;
 				if (omaq_message_id_new(mid, sizeof(mid)) != 0 ||
 				    omaq_message_wire_pack(packed, sizeof(packed), mid, op->reply, op->text) != 0) {
@@ -13946,7 +13955,8 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 				emit_identity_error("identity_exists", op->id);
 				return 0;
 			}
-			if (omaq_av_busy() || g_call_end.used || omaq_file_busy()) {
+			if (omaq_av_busy() || g_call_end.used || omaq_file_busy() ||
+			    omaq_tox_send_pending(g_tox)) {
 				emit_identity_error("busy", op->id);
 				return 0;
 			}

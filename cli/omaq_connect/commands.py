@@ -32,7 +32,7 @@ COMMANDS = [
     (":reply", "Choose a message to reply to (also ctrl+r)", ""),
     (":clear", "Clear this chat on this computer (asks first)", ""),
     (":close", "Close this pane (also ctrl+w)", ""),
-    (":quit", "Quit OmaQ (also :q)", ""),
+    (":quit", "Quit Harbor (also :q)", ""),
 ]
 KITTY = os.environ.get("TERM") == "xterm-kitty"
 ZOOM_KEYS = "ctrl+shift+= / ctrl+shift+-" if KITTY else "ctrl+= / ctrl+-"

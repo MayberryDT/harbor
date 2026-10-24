@@ -1,26 +1,26 @@
-# Understand OmaQ security
+# Understand Harbor security
 
-This page explains what OmaQ encrypts, what public Tox nodes can observe, and which local files need protection.
+This page explains what Harbor encrypts, what public Tox nodes can observe, and which local files need protection.
 
 ## Follow the message path
 
-[![OmaQ encrypted message flow](images/omaq-message-flow.png)](images/omaq-message-flow.png)
+[![Harbor encrypted message flow](images/omaq-message-flow.png)](images/omaq-message-flow.png)
 
-Toxcore transports encrypted packets between peers. Direct text messages receive an additional Signal Double Ratchet layer. OmaQ never falls back to plaintext direct messaging when a Ratchet session is unavailable.
+Toxcore transports encrypted packets between peers. Direct text messages receive an additional Signal Double Ratchet layer. Harbor never falls back to plaintext direct messaging when a Ratchet session is unavailable.
 
-Private Tox New Group Chats use Tox group transport. Group attachments use authenticated, bounded OmaQ packets and remain capped at 8 MiB.
+Private Tox New Group Chats use Tox group transport. Group attachments use authenticated, bounded Harbor packets and remain capped at 1 GiB.
 
 ## Understand relay privacy
 
-OmaQ keeps Tox in Transmission Control Protocol (TCP) relay privacy mode. It disables direct User Datagram Protocol (UDP) discovery, local discovery, and hole punching. Contacts therefore do not receive each other's IP addresses through direct Tox connections.
+Harbor keeps Tox in Transmission Control Protocol (TCP) relay privacy mode. It disables direct User Datagram Protocol (UDP) discovery, local discovery, and hole punching. Contacts therefore do not receive each other's IP addresses through direct Tox connections.
 
-OmaQ connects to public bootstrap and relay nodes run by Tox community volunteers. These nodes help peers discover the network and forward encrypted packets. They cannot read message contents, but relay operators can observe ordinary connection metadata.
+Harbor connects to public bootstrap and relay nodes run by Tox community volunteers. These nodes help peers discover the network and forward encrypted packets. They cannot read message contents, but relay operators can observe ordinary connection metadata.
 
-OmaQ runs no project-operated server, account service, or recovery service. The project author cannot access, intercept, recover, or delete your messages, identity, or contacts.
+Harbor runs no project-operated server, account service, or recovery service. The project author cannot access, intercept, recover, or delete your messages, identity, or contacts.
 
 ## Protect local data
 
-OmaQ stores identity, contact, Ratchet, preference, and history data locally:
+Harbor stores identity, contact, Ratchet, preference, and history data locally:
 
 - `~/.local/share/omaq/`: identity, contacts, groups, avatars, history, and Ratchet state
 - `~/.local/state/omaq/`: identity recovery, preferences, unread state, receipts, surfaces, and journals
@@ -30,13 +30,13 @@ Private filesystem permissions protect these locations. Do not synchronize them 
 
 ## Protect the local session
 
-OmaQ keeps its helper socket and runtime markers private to your user account. These permissions exclude other local accounts; they do not isolate OmaQ from another process already running as you. Treat applications and scripts running under your account as trusted, and lock the session when you leave it.
+Harbor keeps its helper socket and runtime markers private to your user account. These permissions exclude other local accounts; they do not isolate Harbor from another process already running as you. Treat applications and scripts running under your account as trusted, and lock the session when you leave it.
 
-A same-user process that can read the helper instance marker and connect to the private socket can submit helper operations. The compatibility operation `helper.shutdown` can stop the helper without checking private group state, interrupting active messaging, transfers, invitations, or calls until Service starts it again. OmaQ's updater and uninstaller do not use that operation. They request only `helper.shutdown_if_no_groups`, which fails closed when registered or native groups exist or group state is uncertain. After a source-only tree exchange, the uninstaller accepts a running helper on the previous inode only when descriptor-bound SHA-256 checks prove that its stable owner-controlled executable bytes match the live helper.
+A same-user process that can read the helper instance marker and connect to the private socket can submit helper operations. The compatibility operation `helper.shutdown` can stop the helper without checking private group state, interrupting active messaging, transfers, invitations, or calls until Service starts it again. Harbor's updater and uninstaller do not use that operation. They request only `helper.shutdown_if_no_groups`, which fails closed when registered or native groups exist or group state is uncertain. After a source-only tree exchange, the uninstaller accepts a running helper on the previous inode only when descriptor-bound SHA-256 checks prove that its stable owner-controlled executable bytes match the live helper.
 
 The normal `omarchy plugin add` source-install command trusts Omarchy's Git acquisition and the user's Git configuration and environment. URL rewrites, proxies, credential helpers, and TLS settings can change acquisition before the installed `install.sh` runs; later plugin validation cannot undo that pre-execution trust. Use the bounded exact-commit bootstrap in the installation guide when acquisition must ignore user Git configuration and bind reviewed code before execution.
 
-Only `scripts/update-omaq.sh` implements the source/helper update transaction. Do not use Omarchy's generic `plugin update` command for OmaQ, including its all-plugins form: it can fast-forward the live source checkout without rebuilding the native helper.
+Only `scripts/update-omaq.sh` implements the source/helper update transaction. Do not use Omarchy's generic `plugin update` command for Harbor, including its all-plugins form: it can fast-forward the live source checkout without rebuilding the native helper.
 
 Source updates build an externally staged Git checkout before stopping the shell supervisor and watcher. Every public network Git operation uses a fresh private credential-free `HOME` plus sanitized configuration and transport state, so it cannot consume the user's `.netrc`, GitHub CLI credentials, or Git credential helpers. The updater changes the live path with one atomic no-copy exchange. Consumer failures before helper activation roll the tree back under the same shell-off boundary. Restart acceptance tolerates only the wrapper's exact readiness-timeout result, waits for one bound ready supervisor, Quickshell process, and watcher, and then rechecks the session lock; every other restart failure remains fail-closed. A rollback stop terminates each exact replacement supervisor that appears before its deadline. A final verification failure after helper activation leaves the already accepted new tree in place and returns an error because the helper process may have changed. This is a cooperative same-user boundary: do not start or restart the Omarchy shell from another process during an update.
 
@@ -44,7 +44,7 @@ Source updates build an externally staged Git checkout before stopping the shell
 
 A passphrase encrypts the Tox savedata in `tox.save`. It does not encrypt Ratchet state, avatars, receipts, preferences, or chat history.
 
-OmaQ maintains a fingerprint-bound identity-presence record and a current recovery copy. A stale or fingerprint-mismatched copy is never restored automatically. Export a current identity bundle before moving or repairing an established identity.
+Harbor maintains a fingerprint-bound identity-presence record and a current recovery copy. A stale or fingerprint-mismatched copy is never restored automatically. Export a current identity bundle before moving or repairing an established identity.
 
 Identity bundles include Tox savedata, private group mappings, and group friend-binding mappings. They exclude Ratchet sessions, local history, avatars, receipts, and received files. Exchange fresh invitations after importing an identity with existing contacts.
 
@@ -54,7 +54,7 @@ Invitations are private, one-use entry points. Share them through a trusted chan
 
 Compare safety codes through another trusted channel. A code proves only the paired Tox public identities; it does not authenticate the Signal Ratchet identity or prove that a particular person controls either device. Safety codes are not setup secrets.
 
-Use OmaQ only for lawful private communication with people you trust. Read the [illustrated user guide](USER-GUIDE.md#create-and-redeem-invitations) for invitation and safety-code steps.
+Use Harbor only for lawful private communication with people you trust. Read the [illustrated user guide](USER-GUIDE.md#create-and-redeem-invitations) for invitation and safety-code steps.
 
 ## Review the technical contract
 

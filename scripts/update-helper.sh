@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: update-helper.sh [--activate] [--status] [--rollback]
 
-Build OmaQ's helper with the normal Makefile and report whether the detached
+Build Harbor's helper with the normal Makefile and report whether the detached
 runtime still uses an older binary. --activate requests a group-free safe stop;
 Service.qml then starts the newly built helper automatically. --status only
 reports versions. --rollback delegates to update-omaq.sh so helper/omaq.prev is
@@ -133,7 +133,7 @@ fi
 
 if ((activate)); then
   cat >&2 <<'EOF'
-update-helper: activation briefly takes OmaQ offline. In-flight messages become
+update-helper: activation briefly takes Harbor offline. In-flight messages become
 delivery_unknown, and active transfers, calls, or invitations fail visibly.
 EOF
   python3 "$runtime_bound" activate "${common[@]}" \

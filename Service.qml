@@ -13,7 +13,7 @@ Item {
   property int unreadTick: 0
   property var unreadClearPendingByConversation: ({})
   property var unreadClearRetryAfter: ({})
-  property string statusText: "OmaQ"
+  property string statusText: "Harbor"
   property string lastError: ""
   property string persistentWarning: ""
   property string lastErrorConv: ""
@@ -41,8 +41,8 @@ Item {
   property var pendingDirectEvents: []
   property int pendingDirectEventBytes: 0
   property bool pendingDirectEventOverflow: false
-  readonly property int handshakeEventByteLimit: 4 * 1024 * 1024
-  readonly property int directEventByteLimit: 4 * 1024 * 1024
+  readonly property int handshakeEventByteLimit: 8 * 1024 * 1024
+  readonly property int directEventByteLimit: 8 * 1024 * 1024
   property int helperProtocolPid: 0
   property int helperProtocolVersion: 0
   property int activeHelperProtocol: 0
@@ -50,7 +50,7 @@ Item {
   readonly property string helperLaunchNonce: Date.now().toString(36) + "-" +
     Math.floor(Math.random() * 0x100000000).toString(36)
   property string helperProtocolNonce: ""
-  readonly property int requiredHelperProtocol: 7
+  readonly property int requiredHelperProtocol: 17
   readonly property bool supportsIdentityActions: root.activeHelperProtocol >= 8
   readonly property bool supportsAttachments: root.activeHelperProtocol >= 9
   readonly property bool supportsDirectRecovery: root.activeHelperProtocol >= 10
@@ -2845,9 +2845,19 @@ Item {
     return false
   }
 
+  function messageTextFits(value) {
+    try {
+      return encodeURIComponent(String(value || "")).replace(/%[0-9A-F]{2}/g, "x").length <= 65536
+    } catch (e) { return false }
+  }
+
   function sendConversationOp(operation, expectedKey, immediate) {
     var op = operation || ({})
     var conversation = String(op.conversation || "")
+    if ((op.op === "msg.send" || op.op === "message.edit") && !root.messageTextFits(op.text)) {
+      root.rejectBoundOperation(op, "message_too_large")
+      return false
+    }
     if (/^(0|[1-9][0-9]*)$/.test(conversation)) {
       var key = String(expectedKey || "")
       if (!root.directBindingMatches(conversation, key)) {

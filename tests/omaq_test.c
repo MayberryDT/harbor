@@ -2437,7 +2437,7 @@ static void test_group_id(void)
 {
 	char id[OMAQ_GROUP_ID_MAX], title48[49], title49[50];
 	const char embedded_nul[] = { 'a', '\0', 'b' };
-	uint8_t group_message[1401];
+	uint8_t group_message[65794];
 	const char *chat_a =
 		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 	const char *stable_a =
@@ -2453,18 +2453,18 @@ static void test_group_id(void)
 	memset(title49, 'b', sizeof(title49) - 1);
 	title49[sizeof(title49) - 1] = '\0';
 	memset(group_message, 'a', sizeof(group_message));
-	if (!omaq_group_message_bytes_ok(group_message, 1399) ||
-	    omaq_group_message_bytes_ok(group_message, 1400) ||
-	    omaq_group_message_bytes_ok(group_message, 1401))
+	if (!omaq_group_message_bytes_ok(group_message, 65792) ||
+	    omaq_group_message_bytes_ok(group_message, 65793) ||
+	    omaq_group_message_bytes_ok(group_message, 65794))
 		fail("group message length validation");
 	group_message[10] = '\0';
-	if (omaq_group_message_bytes_ok(group_message, 1399))
+	if (omaq_group_message_bytes_ok(group_message, 65792))
 		fail("group message nul validation");
 	group_message[0] = 0xe0;
 	group_message[1] = 0xc0;
 	group_message[2] = 0x80;
 	group_message[10] = 'a';
-	if (omaq_group_message_bytes_ok(group_message, 1399))
+	if (omaq_group_message_bytes_ok(group_message, 65792))
 		fail("group message utf8 validation");
 	if (omaq_message_text_bytes_ok((const uint8_t *)embedded_nul,
 				       sizeof(embedded_nul)) ||

@@ -8,11 +8,11 @@ python3 "$root/tests/material-symbols.py" --font
 umask 077
 tmp=$(mktemp -d /tmp/omaq-symbols-XXXXXX)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-mkdir -p "$tmp/home" "$tmp/runtime" "$tmp/cache" "$tmp/config" "$tmp/data" "$tmp/fonts" "$tmp/OmaQ"
+mkdir -p "$tmp/home" "$tmp/runtime" "$tmp/cache" "$tmp/config" "$tmp/data" "$tmp/fonts" "$tmp/Harbor"
 base_font=$(fc-match -f '%{file}' sans-serif)
 [ -f "$base_font" ]
 ln -s "$base_font" "$tmp/fonts/base.ttf"
-cp "$root/MaterialSymbols.qml" "$root/SafeText.qml" "$tmp/OmaQ/"
+cp "$root/MaterialSymbols.qml" "$root/SafeText.qml" "$tmp/Harbor/"
 python3 - "$tmp" <<'PY'
 from pathlib import Path
 from html import escape
@@ -20,14 +20,14 @@ import sys
 root = Path(sys.argv[1])
 (root / 'fonts.conf').write_text('<fontconfig><dir>' + escape(str(root / 'fonts')) +
     '</dir><cachedir>' + escape(str(root / 'cache')) + '</cachedir></fontconfig>')
-path = root / 'OmaQ/MaterialSymbols.qml'
+path = root / 'Harbor/MaterialSymbols.qml'
 source = path.read_text()
 needle = '  id: symbols\n'
 assert source.count(needle) == 1
 path.write_text(source.replace(needle, needle + '  property alias testSource: symbolFont.source\n'))
 PY
-cat >"$tmp/OmaQ/qmldir" <<'EOF'
-module OmaQ
+cat >"$tmp/Harbor/qmldir" <<'EOF'
+module Harbor
 singleton MaterialSymbols 1.0 MaterialSymbols.qml
 SafeText 1.0 SafeText.qml
 EOF
@@ -35,7 +35,7 @@ cat >"$tmp/shell.qml" <<'QML'
 import QtQuick
 import QtQuick.Window
 import Quickshell
-import "OmaQ" as OmaQ
+import "Harbor" as Harbor
 
 ShellRoot {
   id: test
@@ -49,14 +49,14 @@ ShellRoot {
     }
   }
   function verify(ready) {
-    check(OmaQ.MaterialSymbols.ready === ready, "readiness did not track the loader")
-    check(OmaQ.MaterialSymbols.family === (ready ? "Material Symbols Rounded" : "sans-serif"), "stale family")
-    check(OmaQ.MaterialSymbols.glyph("") === "", "empty icon acquired content")
+    check(Harbor.MaterialSymbols.ready === ready, "readiness did not track the loader")
+    check(Harbor.MaterialSymbols.family === (ready ? "Material Symbols Rounded" : "sans-serif"), "stale family")
+    check(Harbor.MaterialSymbols.glyph("") === "", "empty icon acquired content")
     for (var key of ["unknown_icon", "__proto__", "constructor", "toString", "<b>person</b>"])
-      check(OmaQ.MaterialSymbols.glyph(key) === "?", "unknown name escaped its bounded fallback")
+      check(Harbor.MaterialSymbols.glyph(key) === "?", "unknown name escaped its bounded fallback")
     for (var i = 0; i < icons.item.cells.count; ++i) {
       var cell = icons.item.cells.itemAt(i)
-      check(cell.glyph.text === (ready ? OmaQ.MaterialSymbols.glyphs[cell.modelData] : "?"), "stale displayed glyph")
+      check(cell.glyph.text === (ready ? Harbor.MaterialSymbols.glyphs[cell.modelData] : "?"), "stale displayed glyph")
       check(cell.glyph.text.length === 1 && cell.glyph.implicitWidth > 0 &&
             cell.glyph.implicitWidth <= 25, "icon overflow or empty rendering: " + cell.modelData +
             " width=" + cell.glyph.implicitWidth + " font=" + cell.glyph.font.family + " ready=" + ready)
@@ -69,7 +69,7 @@ ShellRoot {
     width: 720
     height: 590
     color: "#111111"
-    OmaQ.SafeText {
+    Harbor.SafeText {
       id: before
       text: "person"
       font.family: "Material Symbols Rounded"
@@ -88,24 +88,24 @@ ShellRoot {
           spacing: 2
           Repeater {
             id: cells
-            model: Object.keys(OmaQ.MaterialSymbols.glyphs)
+            model: Object.keys(Harbor.MaterialSymbols.glyphs)
             Item {
               required property string modelData
               property alias glyph: glyph
               width: 116
               height: 46
-              OmaQ.SafeText {
+              Harbor.SafeText {
                 id: glyph
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: OmaQ.MaterialSymbols.glyph(parent.modelData)
+                text: Harbor.MaterialSymbols.glyph(parent.modelData)
                 color: "#7dce6a"
-                font.family: OmaQ.MaterialSymbols.family
+                font.family: Harbor.MaterialSymbols.family
                 font.pixelSize: 24
                 font.variableAxes: ({ "FILL": 0, "wght": 500 })
                 font.features: ({ "liga": 0, "clig": 0, "rlig": 0, "calt": 0, "rclt": 0 })
                 renderType: Text.QtRendering
               }
-              OmaQ.SafeText {
+              Harbor.SafeText {
                 anchors.top: glyph.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: parent.modelData
@@ -132,20 +132,20 @@ ShellRoot {
         icons.active = true
         test.phase = 1
       } else if (test.phase === 1) {
-        if (!icons.item || !OmaQ.MaterialSymbols.ready) return
+        if (!icons.item || !Harbor.MaterialSymbols.ready) return
         test.phase = 2
       } else if (test.phase === 2) {
         test.verify(true)
         test.check(Qt.fontFamilies().indexOf("Material Symbols Rounded") >= 0, "font was not registered in the existing engine")
-        test.originalSource = OmaQ.MaterialSymbols.testSource
-        OmaQ.MaterialSymbols.testSource = Qt.resolvedUrl("missing-font.ttf")
+        test.originalSource = Harbor.MaterialSymbols.testSource
+        Harbor.MaterialSymbols.testSource = Qt.resolvedUrl("missing-font.ttf")
         test.phase = 3
       } else if (test.phase === 3) {
         test.verify(false)
-        OmaQ.MaterialSymbols.testSource = test.originalSource
+        Harbor.MaterialSymbols.testSource = test.originalSource
         test.phase = 4
       } else if (test.phase === 4) {
-        if (!OmaQ.MaterialSymbols.ready) return
+        if (!Harbor.MaterialSymbols.ready) return
         test.phase = 5
       } else if (test.phase === 5) {
         test.verify(true)

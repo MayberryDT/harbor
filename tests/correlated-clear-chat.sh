@@ -33,7 +33,7 @@ contracts = {
         'root.reactionStatus = "An item could not be added to chat history"',
     ],
     "helper/omaq.c": [
-        "#define OMAQ_PROTOCOL_VERSION 16",
+        "#define OMAQ_PROTOCOL_VERSION 17",
         "#define OMAQ_HISTORY_CLEAR_VERSION 2",
         "#define OMAQ_HISTORY_CLEAR_VERSION 1",
         "history.clear.succeeded",

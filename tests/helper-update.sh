@@ -5,7 +5,7 @@ root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 source_helper=${1:-$root/tests/omaq_ipc_test_helper}
 [ -x "$source_helper" ] || { echo "helper-update: test helper missing" >&2; exit 1; }
 case "$source_helper" in
-  "$HOME/.config/omarchy/plugins/hancore.omaq/helper/omaq")
+  "$HOME/.config/omarchy/plugins/io.zet.harbor/helper/omaq")
     echo "helper-update: refusing live helper" >&2; exit 1 ;;
 esac
 
@@ -221,8 +221,8 @@ helper:
 EOF
 wrapper=$(XDG_RUNTIME_DIR="$runtime_dir" OMAQ_STATE="$state" \
   "$plugin/scripts/update-helper.sh")
-printf '%s\n' "$wrapper" | grep -q 'OmaQ helper: backup created'
-printf '%s\n' "$wrapper" | grep -q 'OmaQ helper: current'
+printf '%s\n' "$wrapper" | grep -q 'Harbor helper: backup created'
+printf '%s\n' "$wrapper" | grep -q 'Harbor helper: current'
 if python3 "$plugin/scripts/helper-runtime.py" status --root "$plugin" \
     --state "$state" --root-identity 0:0:0:0 >/dev/null 2>&1; then
   echo "helper-update: replaced plugin-root identity was accepted" >&2

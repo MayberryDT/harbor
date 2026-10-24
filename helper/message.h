@@ -3,8 +3,9 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "harbor_transport.h"
 
-#define OMAQ_MESSAGE_TEXT_MAX 1399u
+#define OMAQ_MESSAGE_TEXT_MAX HARBOR_PLAIN_MAX
 
 int omaq_message_text_bytes_ok(const uint8_t *text, size_t length);
 int omaq_message_id_new(char *out, size_t outn);

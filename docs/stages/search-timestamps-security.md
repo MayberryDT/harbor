@@ -18,7 +18,7 @@ This note records the completed per-chat search, authoritative timestamp, PlainT
 - Ordinary QML text uses `SafeText`, whose default is `Text.PlainText`.
 - Only the escaped chat header and escaped Markdown message renderer may use RichText.
 - The exact-source gate canonicalizes QML through Qt's parser, checks inherited controls, rejects AutoText and dynamic or reflective writes, and exercises the real message renderer with hostile input.
-- HTTP fixtures prove that escaped OmaQ output performs no external resource request.
+- HTTP fixtures prove that escaped Harbor output performs no external resource request.
 
 ## Helper security boundary
 

@@ -36,7 +36,7 @@ The chat disables call actions and shows **Ending…** while teardown is pending
 
 A compatibility-preserving follow-up keeps the published Protocol-15 wire fields and both replay rings unchanged. QML now rejects missing or foreign owner correlation after ownership is known, defers a terminal event that raced ahead of a rejected Answer action, prevents a buffered state event from reviving an ended call, and discards pre-handshake events after a helper-process change. If Answer, Decline, Hang up, or Start is unavailable, the active chat or incoming-call panel reports that failure immediately. When a correlated Answer or Decline is rejected but the authoritative state remains incoming or ringing, the process-wide tone is enabled again.
 
-A network failure can prevent delivery of `TOXAV_CALL_CONTROL_CANCEL`. Protocol 15 therefore guarantees only that OmaQ has stopped local capture and transmission; it does not claim peer receipt.
+A network failure can prevent delivery of `TOXAV_CALL_CONTROL_CANCEL`. Protocol 15 therefore guarantees only that Harbor has stopped local capture and transmission; it does not claim peer receipt.
 
 ## Validation
 

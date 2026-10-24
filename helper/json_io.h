@@ -3,8 +3,9 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "harbor_transport.h"
 
-#define OMAQ_JSON_LINE_MAX 4096
+#define OMAQ_JSON_LINE_MAX (HARBOR_ESC_MAX + 2048u)
 #define OMAQ_JSON_STR_MAX 512
 #define OMAQ_JSON_FIELD_OP (UINT64_C(1) << 0)
 #define OMAQ_JSON_FIELD_ID (UINT64_C(1) << 3)
@@ -21,7 +22,7 @@ typedef struct {
 	char payload[OMAQ_JSON_STR_MAX];
 	char id[80];
 	char conversation[80];
-	char text[OMAQ_JSON_STR_MAX];
+	char text[HARBOR_TEXT_MAX + 1];
 	char reply[80];
 	char group[80];
 	char member[80];

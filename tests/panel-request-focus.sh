@@ -178,7 +178,7 @@ import sys
 root = Path(sys.argv[1])
 panel_path = root / "Panel.qml"
 panel = panel_path.read_text(encoding="utf-8")
-needle = '  moduleName: "hancore.omaq"\n'
+needle = '  moduleName: "io.zet.harbor"\n'
 aliases = '''  property alias testService: omaq
   property alias testSelfAvatar: selfHeaderAvatar
   property alias testSelfContent: selfHeaderContent
@@ -241,7 +241,7 @@ import QtQuick
 import Quickshell
 import qs.Ui
 import qs.Commons
-import "omaq" as OmaQ
+import "omaq" as Harbor
 
 ShellRoot {
   id: testRoot
@@ -286,7 +286,7 @@ ShellRoot {
     return true
   }
 
-  OmaQ.Panel {
+  Harbor.Panel {
     id: panel
     opened: false
   }

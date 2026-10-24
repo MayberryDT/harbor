@@ -3,13 +3,14 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "harbor_transport.h"
 
 #define OMAQ_SEND_QUEUE_MAX 64
 #define OMAQ_SEND_QUEUE_PEER_MAX 16
 #define OMAQ_SEND_QUEUE_WAIT_MS 300000
 #define OMAQ_SEND_QUEUE_CONVERSATION_MAX 16
 #define OMAQ_SEND_QUEUE_ID_MAX 80
-#define OMAQ_SEND_QUEUE_TEXT_MAX 512
+#define OMAQ_SEND_QUEUE_TEXT_MAX (HARBOR_TEXT_MAX + 1)
 
 typedef struct {
 	int used;

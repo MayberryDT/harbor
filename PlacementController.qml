@@ -45,7 +45,7 @@ QtObject {
       return
     }
     if (!root.windowReady || !root.scriptPath || !root.windowTitle ||
-        root.windowTitle === "OmaQ chat")
+        root.windowTitle === "Harbor chat")
       return
     root.phase = root.placingPhase
     root.targetTitle = root.windowTitle

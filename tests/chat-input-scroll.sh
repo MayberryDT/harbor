@@ -38,8 +38,8 @@ replacements = {
     '    id: formatButton\n': '''    id: formatButton
     property alias testGlyph: formatTestGlyph
 ''',
-    '      text: OmaQ.MaterialSymbols.glyph(formatButton.materialIcon)\n': '''      id: formatTestGlyph
-      text: OmaQ.MaterialSymbols.glyph(formatButton.materialIcon)
+    '      text: Harbor.MaterialSymbols.glyph(formatButton.materialIcon)\n': '''      id: formatTestGlyph
+      text: Harbor.MaterialSymbols.glyph(formatButton.materialIcon)
 ''',
     '          id: line\n': '''          id: line
           property alias testPicker: reactionPicker
@@ -324,7 +324,7 @@ ShellRoot {
           },
           function() {
             check(page.testComposerMenu.visible && page.testComposerMenu.width >= Style.space(200),
-              "OmaQ context menu unavailable")
+              "Harbor context menu unavailable")
             key(Qt.Key_Escape)
           },
           function() { input.forceActiveFocus(); key(Qt.Key_Return) },

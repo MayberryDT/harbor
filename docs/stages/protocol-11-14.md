@@ -14,7 +14,7 @@ This note records the completed Protocol 11 through 14 product follow-up. The li
 ## Protocol 12: GroupChat attachments
 
 - GroupChat uses the Direct composer for files, images, clipboard paste, drag and drop, canonical staging, previews, acceptance, cancellation, history, playback, and path actions. Calls remain Direct-only.
-- Each group member accepts independently. The helper sends at most 8 MiB through bounded ordered lossless packets to members recorded online at offer time.
+- Each group member accepts independently. The helper sends at most 1 GiB through bounded ordered lossless packets to members recorded online at offer time.
 - Transfer state binds the stable group, sender member key, durable random transfer ID, exact size, and SHA-256 digest.
 - Pending offers use sender-fair memory slots. Durable transfer-ID reservation and history lookup start only after explicit acceptance.
 - Application acknowledgement distinguishes confirmed, failed, partial, and unknown delivery. The sender writes history only while the original source still matches.

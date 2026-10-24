@@ -3,7 +3,7 @@ import secrets
 import time
 from dataclasses import dataclass
 
-from .protocol import FAILURES, FILE_ERRORS, FILE_MAX, TEXT_MAX, is_direct
+from .protocol import FAILURES, FILE_ERRORS, FILE_MAX, PATH_MAX, is_direct
 from .session import bound, friend_of, key_for
 from .text import clean_line, home_path, human_size, utf8
 
@@ -183,10 +183,10 @@ class FileTransfers:
         elif path is None or not os.path.isfile(path) or not os.access(path, os.R_OK):
             self.say("No readable file at %s" % clean_line(given))
         elif self.size_of(path) > FILE_MAX:
-            self.say("Files can be at most 8 MiB")
+            self.say("Files can be at most 1 GiB")
         elif not utf8(path):
             self.say("Path is not valid UTF-8")
-        elif len(path.encode("utf-8")) > TEXT_MAX:
+        elif len(path.encode("utf-8")) > PATH_MAX:
             self.say("Path is too long")
         elif conversation in self.sends:
             self.say(FILE_ERRORS["busy"])

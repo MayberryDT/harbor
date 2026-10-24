@@ -1,10 +1,10 @@
 # Illustrated user guide
 
-This visual guide covers the complete OmaQ workflow: connect with trusted people, use DirectChat and GroupChat, exchange files, manage notifications, chat from a terminal, protect your identity, and recover safely from interrupted state changes. Click any screenshot to open its full-size original.
+This visual guide covers the complete Harbor workflow: connect with trusted people, use DirectChat and GroupChat, exchange files, manage notifications, chat from a terminal, protect your identity, and recover safely from interrupted state changes. Click any screenshot to open its full-size original.
 
 Use this guide by task:
 
-- [Understand OmaQ security](#understand-omaq-security)
+- [Understand Harbor security](#understand-omaq-security)
 - [Open the panel and respond to requests](#open-the-panel-and-respond-to-requests)
 - [Create and redeem invitations](#create-and-redeem-invitations)
 - [Personalize the interface](#personalize-the-interface)
@@ -15,11 +15,11 @@ Use this guide by task:
 - [Chat from the terminal](#chat-from-the-terminal)
 - [Protect and move your identity](#protect-and-move-your-identity)
 - [Handle destructive and recovery states](#handle-destructive-and-recovery-states)
-- [Maintain OmaQ](#maintain-omaq)
+- [Maintain Harbor](#maintain-omaq)
 
-## Understand OmaQ security
+## Understand Harbor security
 
-OmaQ stores identity and history locally. Direct messages add the Signal Double Ratchet to Tox transport and never fall back to plaintext. Read [Security and privacy](SECURITY.md) for relay metadata, local-data protection, passphrase limits, and contact verification.
+Harbor stores identity and history locally. Direct messages add the Signal Double Ratchet to Tox transport and never fall back to plaintext. Read [Security and privacy](SECURITY.md) for relay metadata, local-data protection, passphrase limits, and contact verification.
 
 ## Open the panel and respond to requests
 
@@ -37,14 +37,14 @@ Hover or keyboard-focus an action-rail icon to display its label. Use the rail t
 <table>
 <thead><tr><th>Panel home</th><th>Friend request</th><th>Group invitation</th><th>Open a chat</th></tr></thead>
 <tbody><tr>
-<td><a href="images/guide/01-panel-home.png"><img src="images/guide/01-panel-home.png" alt="OmaQ panel home" width="220"></a><br>Your identity, connection state, friends, groups, support links, and action rail share one compact panel.</td>
+<td><a href="images/guide/01-panel-home.png"><img src="images/guide/01-panel-home.png" alt="Harbor panel home" width="220"></a><br>Your identity, connection state, friends, groups, support links, and action rail share one compact panel.</td>
 <td><a href="images/guide/02-panel-friend-request.png"><img src="images/guide/02-panel-friend-request.png" alt="Pending friend request" width="220"></a><br>A friend request hides the self content and presents clear Accept and Decline actions.</td>
 <td><a href="images/guide/03-panel-group-invite.png"><img src="images/guide/03-panel-group-invite.png" alt="Pending group invitation" width="220"></a><br>A private group invitation uses the same focused decision layout.</td>
 <td><a href="images/guide/06-panel-open-chat.png"><img src="images/guide/06-panel-open-chat.png" alt="Open chat picker" width="220"></a><br>Select an accepted contact to open the matching stable DirectChat window.</td>
 </tr></tbody>
 </table>
 
-Close the panel with `Escape`, another press on the OmaQ bar action, or a click outside. The panel intentionally has no redundant Close button and never keeps a desktop-sized invisible input region.
+Close the panel with `Escape`, another press on the Harbor bar action, or a click outside. The panel intentionally has no redundant Close button and never keeps a desktop-sized invisible input region.
 
 Friend names use the panel's width-driven grid and show online, away, and offline state. Name changes appear immediately in the panel, open DirectChats, and GroupChat member rows, sender labels, and typing labels. Standard font sizes use one wide column; after five contacts, scroll the bounded list to reach the remaining entries. An unread friend receives a `color03` underline, while the bar widget shows the total unread badge when badges are enabled.
 
@@ -55,8 +55,8 @@ A direct connection starts with a one-use `omaq://` invitation shared through a 
 <table>
 <thead><tr><th>Create an invitation</th><th>Redeem an invitation</th><th>Verify identity</th><th>Incoming call</th></tr></thead>
 <tbody><tr>
-<td><a href="images/guide/04-panel-active-invite.png"><img src="images/guide/04-panel-active-invite.png" alt="Active OmaQ invitation" width="220"></a><br>The Invite view shows a QR code, shortened link, exact lifetime, concise share/redeem/accept instructions, Copy link, New link, and Revoke.</td>
-<td><a href="images/guide/05-panel-add-contact.png"><img src="images/guide/05-panel-add-contact.png" alt="Add contact with OmaQ invitation" width="220"></a><br>Paste the complete private invitation and select Join chat. Invalid, expired, self, duplicate, and changed-identity invitations fail visibly. A successful result remains visible until you edit the invitation field again.</td>
+<td><a href="images/guide/04-panel-active-invite.png"><img src="images/guide/04-panel-active-invite.png" alt="Active Harbor invitation" width="220"></a><br>The Invite view shows a QR code, shortened link, exact lifetime, concise share/redeem/accept instructions, Copy link, New link, and Revoke.</td>
+<td><a href="images/guide/05-panel-add-contact.png"><img src="images/guide/05-panel-add-contact.png" alt="Add contact with Harbor invitation" width="220"></a><br>Paste the complete private invitation and select Join chat. Invalid, expired, self, duplicate, and changed-identity invitations fail visibly. A successful result remains visible until you edit the invitation field again.</td>
 <td><strong>Safety code</strong><br>Select a direct contact, display its safety code, and compare it with that contact through another trusted channel. Message search stays inside the matching chat window.</td>
 <td><a href="images/guide/27-panel-incoming-call.png"><img src="images/guide/27-panel-incoming-call.png" alt="Incoming direct voice call" width="220"></a><br>An incoming DirectCall offers Answer and Decline. Opening the caller's chat never answers automatically.</td>
 </tr></tbody>
@@ -81,15 +81,15 @@ A new link expires 24 hours after the helper issues it. **New link** first revok
 
 ## Personalize the interface
 
-Panel preferences use the active OmaQ and Omarchy visual system. Message scaling changes message bodies and composer input; composer controls, receipts, and group member labels keep their normal size.
+Panel preferences use the active Harbor and Omarchy visual system. Message scaling changes message bodies and composer input; composer controls, receipts, and group member labels keep their normal size.
 
 <table>
 <thead><tr><th>Message size</th><th>Chat theme</th><th>Notification sound</th><th>Demo window</th></tr></thead>
 <tbody><tr>
 <td><a href="images/guide/07-panel-message-size.png"><img src="images/guide/07-panel-message-size.png" alt="Chat message size options" width="220"></a><br>Choose 90%, 100%, 110%, 120%, or 140% and review the live preview. The same step scales message bodies and text typed in the composer.</td>
-<td><a href="images/guide/08-panel-themes.png"><img src="images/guide/08-panel-themes.png" alt="OmaQ chat themes" width="220"></a><br>Select the system palette or a bundled chat palette. The panel itself continues to follow Omarchy.</td>
-<td><strong>Knock (default) · PING · MAIL · Aurora · Glow · Click</strong><br>Preview a bundled sound, choose Off, or import a bounded PCM WAV file. Removing a custom entry deletes only OmaQ's managed copy; the source file and bundled sounds remain unchanged.</td>
-<td><a href="images/guide/35-demo-window.png"><img src="images/guide/35-demo-window.png" alt="OmaQ Demo chat window" width="220"></a><br>Test messages, formatting, wrapping, and the composer locally. Demo sends nothing.</td>
+<td><a href="images/guide/08-panel-themes.png"><img src="images/guide/08-panel-themes.png" alt="Harbor chat themes" width="220"></a><br>Select the system palette or a bundled chat palette. The panel itself continues to follow Omarchy.</td>
+<td><strong>Knock (default) · PING · MAIL · Aurora · Glow · Click</strong><br>Preview a bundled sound, choose Off, or import a bounded PCM WAV file. Removing a custom entry deletes only Harbor's managed copy; the source file and bundled sounds remain unchanged.</td>
+<td><a href="images/guide/35-demo-window.png"><img src="images/guide/35-demo-window.png" alt="Harbor Demo chat window" width="220"></a><br>Test messages, formatting, wrapping, and the composer locally. Demo sends nothing.</td>
 </tr></tbody>
 </table>
 
@@ -107,7 +107,7 @@ New DirectChat and GroupChat windows use the compositor's standard opening anima
 <td><a href="images/guide/15-direct-chat-overview.png"><img src="images/guide/15-direct-chat-overview.png" alt="DirectChat messages and receipts" width="220"></a><br>The header keeps the contact name beside online, offline, reconnecting, or typing state. The history shows incoming and outgoing bubbles, receipts, reactions, and unread separation.</td>
 <td><a href="images/guide/16-direct-formatting.png"><img src="images/guide/16-direct-formatting.png" alt="DirectChat formatting toolbar" width="220"></a><br>Toggle Heading, Bold, Italic, Quote, Code, Link, unordered list, numbered list, and task list tools.</td>
 <td><a href="images/guide/17-direct-emoji-picker.png"><img src="images/guide/17-direct-emoji-picker.png" alt="DirectChat emoji picker" width="220"></a><br>Scroll through the picker or paste another valid Unicode emoji sequence. Emoji-only messages use the fixed 56-pixel presentation. A message's React action shows the five most-used reactions in the loaded conversation at the same size as this picker.</td>
-<td><a href="images/guide/21-direct-clear-confirm.png"><img src="images/guide/21-direct-clear-confirm.png" alt="Clear DirectChat confirmation" width="220"></a><br>Confirm Clear chat to remove only this chat's local history. OmaQ never queues it for reconnect and applies results only to the matching conversation and request.</td>
+<td><a href="images/guide/21-direct-clear-confirm.png"><img src="images/guide/21-direct-clear-confirm.png" alt="Clear DirectChat confirmation" width="220"></a><br>Confirm Clear chat to remove only this chat's local history. Harbor never queues it for reconnect and applies results only to the matching conversation and request.</td>
 </tr></tbody>
 </table>
 
@@ -148,23 +148,23 @@ DirectChat uses Tox friend-file transfers. Incoming files remain paused until th
 <td><a href="images/guide/18-direct-file-picker.png"><img src="images/guide/18-direct-file-picker.png" alt="DirectChat file picker" width="220"></a><br>Choose a file or enter an absolute path, then select Send file. An active outgoing transfer can be canceled.</td>
 <td><a href="images/guide/19-direct-file-offer.png"><img src="images/guide/19-direct-file-offer.png" alt="Incoming DirectChat file offer" width="220"></a><br>The recipient explicitly accepts or declines the named file before bytes are written.</td>
 <td><a href="images/guide/20-direct-image-preview.png"><img src="images/guide/20-direct-image-preview.png" alt="Pending DirectChat image preview" width="220"></a><br>Selected, dropped, or pasted PNG, JPEG, and WebP images receive a private helper-validated preview before sending.</td>
-<td><a href="images/guide/36-direct-file-history.png"><img src="images/guide/36-direct-file-history.png" alt="Completed files in DirectChat history" width="220"></a><br>Completed files keep a local path. Open its containing folder or copy the full path from the OmaQ context menu.</td>
+<td><a href="images/guide/36-direct-file-history.png"><img src="images/guide/36-direct-file-history.png" alt="Completed files in DirectChat history" width="220"></a><br>Completed files keep a local path. Open its containing folder or copy the full path from the Harbor context menu.</td>
 </tr></tbody>
 </table>
 
-Image bubbles use a 56×56 preview and open the complete local file when selected. OmaQ fully decodes and canonically rewrites incoming images before displaying them. Video files remain ordinary downloads without inline previews, while received audio files provide Play and Pause controls.
+Image bubbles use a 56×56 preview and open the complete local file when selected. Harbor fully decodes and canonically rewrites incoming images before displaying them. Video files remain ordinary downloads without inline previews, while received audio files provide Play and Pause controls.
 
-The helper limits attachments to 8 MiB, rejects symlink destinations, and writes accepted downloads with private permissions. Override the destination with `OMAQ_DOWNLOAD_DIR` or `XDG_DOWNLOAD_DIR`.
+The helper limits attachments to 1 GiB, rejects symlink destinations, and writes accepted downloads with private permissions. Override the destination with `OMAQ_DOWNLOAD_DIR` or `XDG_DOWNLOAD_DIR`.
 
 ## Make DirectChat voice calls
 
 VoiceCall is available only in DirectChat. The bar icon pulses while a call rings, and one process-wide tone owner prevents layered ringing across monitors.
 
-Select the call action to ring a contact. The recipient can Answer, Decline, or Hang up while ringing. An active call shows elapsed time and retains Hang up. After you select Hang up, the chat shows **Ending…** until the helper confirms that local capture, buffered audio, and the old call transport have stopped. It then shows **Call ended** or a more specific local result. If bounded reconnect replay no longer contains the expected result, OmaQ reports **Call result unavailable after reconnect** without claiming a confirmed hangup.
+Select the call action to ring a contact. The recipient can Answer, Decline, or Hang up while ringing. An active call shows elapsed time and retains Hang up. After you select Hang up, the chat shows **Ending…** until the helper confirms that local capture, buffered audio, and the old call transport have stopped. It then shows **Call ended** or a more specific local result. If bounded reconnect replay no longer contains the expected result, Harbor reports **Call result unavailable after reconnect** without claiming a confirmed hangup.
 
 Call controls report unavailable actions rather than queueing them for reconnect. A confirmed hangup covers only the local stop; a network failure can prevent delivery of the cancellation.
 
-OmaQ captures and plays 48 kHz mono audio through the PulseAudio client library. PipeWire-Pulse supplies desktop devices. OmaQ keeps call audio in bounded memory and does not record it.
+Harbor captures and plays 48 kHz mono audio through the PulseAudio client library. PipeWire-Pulse supplies desktop devices. Harbor keeps call audio in bounded memory and does not record it.
 
 ## Create and manage private groups
 
@@ -181,8 +181,8 @@ Create and open a group in this order:
 <table>
 <thead><tr><th>Groups panel</th><th>GroupChat</th><th>Member list</th><th>Add a member</th></tr></thead>
 <tbody><tr>
-<td><a href="images/guide/11-panel-groups.png"><img src="images/guide/11-panel-groups.png" alt="OmaQ groups panel" width="220"></a><br>Create a named group, select it, open it, invite an absent contact, leave it, or dissolve it when you are the owner.</td>
-<td><a href="images/guide/22-group-chat-overview.png"><img src="images/guide/22-group-chat-overview.png" alt="OmaQ GroupChat overview" width="220"></a><br>GroupChat shows sender names, member typing, reactions, system messages, member-aware receipts, files, images, and the shared composer. Calls are intentionally absent.</td>
+<td><a href="images/guide/11-panel-groups.png"><img src="images/guide/11-panel-groups.png" alt="Harbor groups panel" width="220"></a><br>Create a named group, select it, open it, invite an absent contact, leave it, or dissolve it when you are the owner.</td>
+<td><a href="images/guide/22-group-chat-overview.png"><img src="images/guide/22-group-chat-overview.png" alt="Harbor GroupChat overview" width="220"></a><br>GroupChat shows sender names, member typing, reactions, system messages, member-aware receipts, files, images, and the shared composer. Calls are intentionally absent.</td>
 <td><a href="images/guide/23-group-members.png"><img src="images/guide/23-group-members.png" alt="GroupChat member strip" width="220"></a><br>The strip shows You, owner/admin/member roles, and filled online or muted offline presence indicators.</td>
 <td><a href="images/guide/24-group-add-member.png"><img src="images/guide/24-group-add-member.png" alt="Add a GroupChat member" width="220"></a><br>Owners and admins select a contact who is not already present, then send a private invitation.</td>
 </tr></tbody>
@@ -206,11 +206,11 @@ Group attachments are offered independently to each online member and are not qu
 
 ## Chat from the terminal
 
-`omaq-connect` opens your chats in a terminal. It uses the same helper, identity, contacts, and history as the bar, so you can use both at once or the terminal alone.
+`harbor-connect` opens your chats in a terminal. It uses the same helper, identity, contacts, and history as the bar, so you can use both at once or the terminal alone.
 
 ```bash
-omaq-connect           # opens your first friend
-omaq-connect alice     # opens alice
+harbor-connect           # opens your first friend
+harbor-connect alice     # opens alice
 ```
 
 <a href="images/guide/38-terminal-overview.png"><img src="images/guide/38-terminal-overview.png" alt="Terminal client with two chats side by side" width="100%"></a>
@@ -287,7 +287,7 @@ Confirmations expire after 15 seconds.
 
 ### Send and receive files
 
-Run `:sendfile ~/notes.pdf` to send a file to the open chat. A path relative to the current folder works too, and files can be up to 8 MiB. One file per chat travels at a time. While it travels, the chat shows its progress at the bottom, such as `Sending notes.pdf  ███████░░░ 70%`, even while you scroll, and `:cancelfile` stops it.
+Run `:sendfile ~/notes.pdf` to send a file to the open chat. A path relative to the current folder works too, and files can be up to 1 GiB. One file per chat travels at a time. While it travels, the chat shows its progress at the bottom, such as `Sending notes.pdf  ███████░░░ 70%`, even while you scroll, and `:cancelfile` stops it.
 
 To pick the file instead of typing its whole path, type `:sendfile ~/` and press `Tab`. A list above the input line shows the folders and files in that folder, folders first and files with their size. Typing filters it, `Up`/`Down` choose, `Tab` or `Enter` opens a folder or takes a file into the line, `Left` goes back, and `Esc` closes the list. The next `Enter` sends the file. Hidden files appear once the name you type starts with `.`.
 
@@ -326,10 +326,10 @@ Select **Identity** in the action rail. Enter a passphrase before **Protect** or
 <table>
 <thead><tr><th>Identity actions</th><th>Locked identity</th><th>Import confirmation</th><th>Direct recovery</th></tr></thead>
 <tbody><tr>
-<td><a href="images/guide/12-panel-identity.png"><img src="images/guide/12-panel-identity.png" alt="OmaQ identity actions" width="220"></a><br>Protect or remove the lock, export a bundle, validate a selected bundle, or start separately confirmed import.</td>
-<td><a href="images/guide/14-panel-locked.png"><img src="images/guide/14-panel-locked.png" alt="Locked OmaQ identity" width="220"></a><br>Enter the existing passphrase to unlock. Passphrases are sent only to a ready local helper and are never queued.</td>
-<td><a href="images/guide/32-panel-identity-import-confirm.png"><img src="images/guide/32-panel-identity-import-confirm.png" alt="OmaQ identity import confirmation" width="220"></a><br>Import activates the exact validated bundle only after confirmation and restores the previous identity if replacement fails.</td>
-<td><a href="images/guide/33-panel-direct-recovery.png"><img src="images/guide/33-panel-direct-recovery.png" alt="Direct chat recovery warning" width="220"></a><br>When old numeric state cannot be bound safely, OmaQ preserves identity and contacts, archives ambiguous chat state, and requests fresh invitations.</td>
+<td><a href="images/guide/12-panel-identity.png"><img src="images/guide/12-panel-identity.png" alt="Harbor identity actions" width="220"></a><br>Protect or remove the lock, export a bundle, validate a selected bundle, or start separately confirmed import.</td>
+<td><a href="images/guide/14-panel-locked.png"><img src="images/guide/14-panel-locked.png" alt="Locked Harbor identity" width="220"></a><br>Enter the existing passphrase to unlock. Passphrases are sent only to a ready local helper and are never queued.</td>
+<td><a href="images/guide/32-panel-identity-import-confirm.png"><img src="images/guide/32-panel-identity-import-confirm.png" alt="Harbor identity import confirmation" width="220"></a><br>Import activates the exact validated bundle only after confirmation and restores the previous identity if replacement fails.</td>
+<td><a href="images/guide/33-panel-direct-recovery.png"><img src="images/guide/33-panel-direct-recovery.png" alt="Direct chat recovery warning" width="220"></a><br>When old numeric state cannot be bound safely, Harbor preserves identity and contacts, archives ambiguous chat state, and requests fresh invitations.</td>
 </tr></tbody>
 </table>
 
@@ -337,7 +337,7 @@ Use at least 8 Unicode characters and no more than 128 UTF-8 bytes for a new pas
 
 Export bundles include Tox savedata, the private group registry, and group friend-binding mappings. They deliberately exclude Ratchet sessions, local history, avatars, receipts, and files. Transfer a bundle securely and delete extra copies.
 
-After importing an identity with existing contacts, remove affected contacts on both devices and exchange fresh invitations before messaging. Restoring stale Double Ratchet sessions could reuse old message state, so OmaQ does not include them in identity bundles.
+After importing an identity with existing contacts, remove affected contacts on both devices and exchange fresh invitations before messaging. Restoring stale Double Ratchet sessions could reuse old message state, so Harbor does not include them in identity bundles.
 
 ## Handle destructive and recovery states
 
@@ -346,7 +346,7 @@ Danger-zone actions name the affected contact or personal-ID change and require 
 <table>
 <thead><tr><th>Danger zone</th><th>Remove contact</th><th>Rotate personal ID</th><th>Verify state</th></tr></thead>
 <tbody><tr>
-<td><a href="images/guide/13-panel-danger-zone.png"><img src="images/guide/13-panel-danger-zone.png" alt="OmaQ danger zone" width="220"></a><br>Contact removal and personal-ID rotation remain separate, explicitly confirmed operations.</td>
+<td><a href="images/guide/13-panel-danger-zone.png"><img src="images/guide/13-panel-danger-zone.png" alt="Harbor danger zone" width="220"></a><br>Contact removal and personal-ID rotation remain separate, explicitly confirmed operations.</td>
 <td><a href="images/guide/28-panel-remove-contact-confirm.png"><img src="images/guide/28-panel-remove-contact-confirm.png" alt="Remove contact confirmation" width="220"></a><br>Removing a contact clears current Ratchet trust for that contact but retains local history.</td>
 <td><a href="images/guide/29-panel-rotate-id-confirm.png"><img src="images/guide/29-panel-rotate-id-confirm.png" alt="Rotate personal ID confirmation" width="220"></a><br>Rotation voids every open invitation and requires immediate confirmation.</td>
 <td><a href="images/guide/34-panel-primary-state-warning.png"><img src="images/guide/34-panel-primary-state-warning.png" alt="Verify identity state warning" width="220"></a><br>After uncertain directory durability, messaging and mutations pause until you inspect the surviving state and mark it verified.</td>
@@ -355,6 +355,6 @@ Danger-zone actions name the affected contact or personal-ID change and require 
 
 Do not delete recovery markers manually. Follow the exact warning and complete its verification or fresh-invite steps. If recovery is degraded, export a current bundle before relying on the backup.
 
-## Maintain OmaQ
+## Maintain Harbor
 
 Use the [installation lifecycle guide](INSTALLATION.md) for installation, shell-off source updates, helper status, rollback, removal, retained data, and optional package cleanup. The updater builds externally and changes the live checkout only after the Omarchy shell supervisor and plugin watcher have stopped.

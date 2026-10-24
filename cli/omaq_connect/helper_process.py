@@ -61,7 +61,7 @@ class HelperProcess:
     def start(self, home, state):
         binary = helper_binary()
         if not os.access(binary, os.X_OK):
-            self.say("OmaQ helper not found: %s" % binary, 30)
+            self.say("Harbor helper not found: %s" % binary, 30)
             return
         for path in (home, state):
             problem = ensure_private_dir(path)

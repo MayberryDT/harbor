@@ -1,18 +1,20 @@
 {
   "schemaVersion": 1,
-  "id": "hancore.omaq",
-  "name": "OmaQ",
-  "version": "1.2.0",
-  "author": "hancore",
+  "id": "io.zet.harbor",
+  "name": "Harbor",
+  "version": "1.3.0",
+  "author": "MayberryDT; based on OmaQ by hancore",
   "license": "MIT AND GPL-3.0-only AND CC-BY-SA-4.0 AND CC0-1.0 AND OFL-1.1-no-RFN AND LicenseRef-Pixabay-Content",
-  "description": "Invite-only 1:1 and group chat for the Omarchy bar.",
-  "kinds": ["bar-widget"],
+  "description": "Invite-only chat with room for long messages and larger cargo.",
+  "kinds": [
+    "bar-widget"
+  ],
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "OmaQ",
-    "description": "OmaQ chat",
+    "displayName": "Harbor",
+    "description": "Harbor chat",
     "category": "Communication",
     "allowMultiple": false,
     "defaultSection": "right",
@@ -30,17 +32,102 @@
       "formatToolbar": false
     },
     "schema": [
-      { "key": "notifyBadge", "type": "boolean", "label": "Badge", "defaultValue": true },
-      { "key": "notifyRightPanel", "type": "boolean", "label": "Right panel", "defaultValue": false },
-      { "key": "notifyDesktop", "type": "boolean", "label": "Desktop notification", "defaultValue": false },
-      { "key": "surfaceMode", "type": "enum", "label": "Cards", "options": ["separate", "bundled"], "defaultValue": "separate" },
-      { "key": "sound", "type": "enum", "label": "Sound", "options": ["off", "qq", "msn", "aurora", "glow", "click", "knock", "custom"], "defaultValue": "knock" },
-      { "key": "soundCustomPath", "type": "path", "label": "Custom sound", "defaultValue": "" },
-      { "key": "soundCustomId", "type": "string", "label": "Managed custom sound", "defaultValue": "" },
-      { "key": "chatTheme", "type": "enum", "label": "Chat theme", "options": ["system", "gruvbox", "rose-pine", "everforest", "gruvbox-light", "catppuccin-latte", "tokyo-night-light"], "defaultValue": "system" },
-      { "key": "messageScale", "type": "enum", "label": "Chat message scale", "options": [0.9, 1.0, 1.1, 1.2, 1.4], "defaultValue": 1.0 },
-      { "key": "animateUnread", "type": "boolean", "label": "Unread motion", "defaultValue": true },
-      { "key": "formatToolbar", "type": "boolean", "label": "Formatting toolbar", "defaultValue": false }
+      {
+        "key": "notifyBadge",
+        "type": "boolean",
+        "label": "Badge",
+        "defaultValue": true
+      },
+      {
+        "key": "notifyRightPanel",
+        "type": "boolean",
+        "label": "Right panel",
+        "defaultValue": false
+      },
+      {
+        "key": "notifyDesktop",
+        "type": "boolean",
+        "label": "Desktop notification",
+        "defaultValue": false
+      },
+      {
+        "key": "surfaceMode",
+        "type": "enum",
+        "label": "Cards",
+        "options": [
+          "separate",
+          "bundled"
+        ],
+        "defaultValue": "separate"
+      },
+      {
+        "key": "sound",
+        "type": "enum",
+        "label": "Sound",
+        "options": [
+          "off",
+          "qq",
+          "msn",
+          "aurora",
+          "glow",
+          "click",
+          "knock",
+          "custom"
+        ],
+        "defaultValue": "knock"
+      },
+      {
+        "key": "soundCustomPath",
+        "type": "path",
+        "label": "Custom sound",
+        "defaultValue": ""
+      },
+      {
+        "key": "soundCustomId",
+        "type": "string",
+        "label": "Managed custom sound",
+        "defaultValue": ""
+      },
+      {
+        "key": "chatTheme",
+        "type": "enum",
+        "label": "Chat theme",
+        "options": [
+          "system",
+          "gruvbox",
+          "rose-pine",
+          "everforest",
+          "gruvbox-light",
+          "catppuccin-latte",
+          "tokyo-night-light"
+        ],
+        "defaultValue": "system"
+      },
+      {
+        "key": "messageScale",
+        "type": "enum",
+        "label": "Chat message scale",
+        "options": [
+          0.9,
+          1.0,
+          1.1,
+          1.2,
+          1.4
+        ],
+        "defaultValue": 1.0
+      },
+      {
+        "key": "animateUnread",
+        "type": "boolean",
+        "label": "Unread motion",
+        "defaultValue": true
+      },
+      {
+        "key": "formatToolbar",
+        "type": "boolean",
+        "label": "Formatting toolbar",
+        "defaultValue": false
+      }
     ]
   }
 }

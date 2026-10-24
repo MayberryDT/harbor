@@ -10,8 +10,8 @@ IDENTITY_SECONDS = 20
 PATH_BYTES = 512
 BUNDLE_NAME = "omaq-identity.save"
 USAGE = "Usage: :identity, or :identity protect, unprotect, export [path], validate <path> or import <path>"
-TIMED_OUT = "The identity action timed out. Check OmaQ status and try again."
-UNKNOWN = "Identity action result unknown. Check OmaQ status and try again."
+TIMED_OUT = "The identity action timed out. Check Harbor status and try again."
+UNKNOWN = "Identity action result unknown. Check Harbor status and try again."
 MISMATCH = "Passphrases do not match."
 NOT_KNOWN = "Your identity's protection is not known yet"
 NEW_RULE = "Use at least 8 characters and at most 128 bytes."
@@ -50,17 +50,17 @@ ERRORS = {
     "identity_changed": "Identity changed. Pending actions were discarded.",
     "identity_backup_failed": "Could not create a safe identity backup.",
     "identity_backup_cleanup_failed": "An old identity recovery backup could not be removed.",
-    "runtime_marker_failed": "Your identity change is saved, but OmaQ could not update its runtime file. Free some disk space, then restart OmaQ; until then, quitting may leave it running.",
+    "runtime_marker_failed": "Your identity change is saved, but Harbor could not update its runtime file. Free some disk space, then restart Harbor; until then, quitting may leave it running.",
     "identity_state_archive_failed": "Could not archive the previous identity's local data.",
-    "identity_rollback_failed": "Identity restore failed. The backup was kept in the OmaQ data folder.",
-    "identity_missing": "Your existing OmaQ identity is unavailable. No replacement identity was created. Restore or import the original identity.",
-    "identity_mismatch": "The active identity does not match OmaQ's protected identity record. No contact state was changed.",
-    "identity_guard_invalid": "OmaQ could not verify the protected identity state and stopped before creating a replacement.",
+    "identity_rollback_failed": "Identity restore failed. The backup was kept in the Harbor data folder.",
+    "identity_missing": "Your existing Harbor identity is unavailable. No replacement identity was created. Restore or import the original identity.",
+    "identity_mismatch": "The active identity does not match Harbor's protected identity record. No contact state was changed.",
+    "identity_guard_invalid": "Harbor could not verify the protected identity state and stopped before creating a replacement.",
     "identity_recovery_degraded": "Your active identity is saved, but its additional recovery copy could not be updated. Export an identity bundle before relying on automatic recovery.",
-    "identity_primary_uncertain": "OmaQ could not confirm that the latest identity/contact change reached disk. The helper stopped using that identity; restart OmaQ and verify the result before retrying.",
+    "identity_primary_uncertain": "Harbor could not confirm that the latest identity/contact change reached disk. The helper stopped using that identity; restart Harbor and verify the result before retrying.",
     "group_registry_failed": "Could not safely save private group state.",
     "direct_state_migration_failed": "Legacy direct-chat state could not be migrated safely.",
-    "direct_state_reinvite_required": "Your OmaQ identity and contacts are intact. Some older direct-chat encryption state was safely archived and requires fresh invites.",
+    "direct_state_reinvite_required": "Your Harbor identity and contacts are intact. Some older direct-chat encryption state was safely archived and requires fresh invites.",
 }
 
 

@@ -11,6 +11,7 @@ Item {
   // Stable Material Symbols codepoints, checked against the installed font.
   // circle_outline uses circle with FILL=0; remove_reaction uses remove.
   readonly property var glyphs: Object.freeze({
+    "anchor": "\uf1cd",
     "add_reaction": "\ue1d3",
     "attach_file": "\ue226",
     "audio_file": "\ueb82",

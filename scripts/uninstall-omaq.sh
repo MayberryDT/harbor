@@ -1,12 +1,12 @@
 #!/bin/bash
-# Remove the OmaQ plugin without silently deleting private user data.
+# Remove the Harbor plugin without silently deleting private user data.
 set -euo pipefail
 
 usage() {
   cat <<'EOF'
 Usage: uninstall-omaq.sh [--yes]
 
-Unloads and removes the OmaQ plugin. In an interactive run, each remaining OmaQ
+Unloads and removes the Harbor plugin. In an interactive run, each remaining Harbor
 data directory is offered separately for removal with No as the default. --yes
 retains all data. Dependency cleanup remains a separate manual Pacman command.
 EOF
@@ -36,7 +36,7 @@ if (( ! assume_yes )); then
     echo "uninstall-omaq: refusing to continue without confirmation; pass --yes" >&2
     exit 1
   fi
-  gum confirm "Remove the OmaQ plugin? Data cleanup will be offered separately." || exit 1
+  gum confirm "Remove the Harbor plugin? Data cleanup will be offered separately." || exit 1
 fi
 
 plugin_root=$(unset CDPATH; cd -- "$(dirname -- "$0")/.." && pwd -P)
@@ -486,7 +486,7 @@ try:
 except (BlockingIOError, OSError) as error:
     raise SystemExit(f"uninstall-omaq: cannot lock helper startup during removal: {error}")
 result = subprocess.run(
-    [omarchy, "plugin", "remove", "hancore.omaq", "--yes"],
+    [omarchy, "plugin", "remove", "io.zet.harbor", "--yes"],
     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, check=False)
 sys.stdout.buffer.write(result.stdout)
 sys.stdout.buffer.flush()
@@ -497,9 +497,9 @@ remove_status=$?
 set -e
 printf '%s\n' "$remove_output"
 plugin_backup=$(printf '%s\n' "$remove_output" |
-  sed -n 's/^Removed hancore\.omaq\. Backup at: \(.*\)$/\1/p' | tail -n 1)
+  sed -n 's/^Removed io\.zet\.harbor\. Backup at: \(.*\)$/\1/p' | tail -n 1)
 if ! printf '%s\n' "$remove_output" |
-     grep -Eq '^(Removed|Unlinked) hancore\.omaq(\.|$)'; then
+     grep -Eq '^(Removed|Unlinked) io\.zet\.harbor(\.|$)'; then
   if (( remove_status != 0 )); then
     echo "uninstall-omaq: plugin removal failed before completion" >&2
     exit "$remove_status"
@@ -511,7 +511,7 @@ fi
 cleanup_marker
 trap - EXIT
 runtime_root=${XDG_RUNTIME_DIR:-"/tmp/omaq-runtime-${UID}"}
-rule_dir="$runtime_root/omaq-hypr"
+rule_dir="$runtime_root/harbor-hypr"
 if ! python3 - "$rule_dir" <<'PY'
 import os
 import re
@@ -769,11 +769,11 @@ if (( remove_status != 0 )); then
   exit "$remove_status"
 fi
 
-cli_link="$HOME/.local/bin/omaq-connect"
+cli_link="$HOME/.local/bin/harbor-connect"
 if [[ -L $cli_link && ! -e $cli_link ]]; then
   cli_target=$(/usr/bin/readlink -- "$cli_link" || true)
   case $cli_target in
-    */hancore.omaq/cli/omaq.py)
+    */io.zet.harbor/cli/omaq.py)
       if /usr/bin/rm -f -- "$cli_link"; then
         printf 'Removed: %q\n' "$cli_link"
       fi
@@ -844,7 +844,7 @@ done
 
 cat <<'EOF'
 
-OmaQ removed. Unselected data and all packages were kept.
+Harbor removed. Unselected data and all packages were kept.
 Optional package removal (Pacman refuses required packages):
   sudo pacman -R toxcore libsignal-protocol-c libpulse libpng libjpeg-turbo libwebp ttf-material-symbols-variable qrencode
 EOF

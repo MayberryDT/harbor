@@ -1,6 +1,6 @@
 # Material Symbols loading and glyphs
 
-Unreleased follow-up for [issue #55](https://github.com/HANCORE-linux/OmaQ/issues/55).
+Unreleased follow-up for [issue #55](https://github.com/MayberryDT/harbor/issues/55).
 
 ## Behavior
 

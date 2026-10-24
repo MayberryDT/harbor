@@ -2,7 +2,7 @@ import secrets
 import time
 from dataclasses import dataclass
 
-from .protocol import FAILURES, INVITE_ERRORS, REDEEMED_DIRECT, REDEEMED_GROUP, TEXT_MAX, hex64, safety_ok
+from .protocol import FAILURES, INVITE_ERRORS, REDEEMED_DIRECT, REDEEMED_GROUP, PATH_MAX, hex64, safety_ok
 
 ACTION_SECONDS = 10
 
@@ -67,7 +67,7 @@ class Invites:
         link = arg.strip()
         if not link.startswith("omaq://"):
             self.say("Paste the omaq:// link after :redeem")
-        elif len(link.encode("utf-8")) > TEXT_MAX:
+        elif len(link.encode("utf-8")) > PATH_MAX:
             self.say("Link is too long")
         else:
             self.redeem_request = "cli-redeem-" + secrets.token_hex(8)
@@ -135,7 +135,7 @@ class Invites:
             kind = str(ev.get("kind") or "")
             safety = str(ev.get("safety") or "")
             if kind not in ("direct", "group") or (kind == "direct" and not (hex64(ev.get("key")) and safety_ok(safety))):
-                self.say("OmaQ received an invalid response from the running helper.")
+                self.say("Harbor received an invalid response from the running helper.")
             else:
                 self.show_overlay("redeemed", group=kind == "group", safety=safety)
                 self.say(REDEEMED_GROUP if kind == "group" else REDEEMED_DIRECT, 15)

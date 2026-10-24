@@ -177,7 +177,7 @@ class Link(unittest.TestCase):
     def test_stale_omaq_link_is_replaced(self):
         path = cli.link_path()
         cli.os.makedirs(cli.os.path.dirname(path))
-        cli.os.symlink("/gone/plugins/hancore.omaq/cli/omaq.py", path)
+        cli.os.symlink("/gone/plugins/io.zet.harbor/cli/omaq.py", path)
         self.assertEqual(cli.install_link(), 0)
         self.assertEqual(cli.os.readlink(path), cli.os.path.realpath(cli.__file__))
 
@@ -195,14 +195,14 @@ class InstallerHook(unittest.TestCase):
         old = os.environ.get("HOME")
         try:
             os.environ["HOME"] = os.path.join(base, "home")
-            root = Path(base) / "plugins" / "hancore.omaq"
+            root = Path(base) / "plugins" / "io.zet.harbor"
             (root / "cli").mkdir(parents=True)
             shutil.copy2(os.path.join(ROOT, "cli", "omaq.py"), root / "cli" / "omaq.py")
             shutil.copytree(os.path.join(ROOT, "cli", "omaq_connect"), root / "cli" / "omaq_connect",
                             ignore=shutil.ignore_patterns("__pycache__"))
             shutil.copy2(os.path.join(ROOT, "manifest.json"), root / "manifest.json")
             module.link_cli(root)
-            link = os.path.join(base, "home", ".local", "bin", "omaq-connect")
+            link = os.path.join(base, "home", ".local", "bin", "harbor-connect")
             self.assertEqual(os.readlink(link), str(root / "cli" / "omaq.py"))
             module.link_cli(Path(base) / "missing")
             self.assertEqual(os.readlink(link), str(root / "cli" / "omaq.py"))
@@ -220,7 +220,7 @@ class InstallerHook(unittest.TestCase):
                             ignore=shutil.ignore_patterns("__pycache__"))
             result = subprocess.run([sys.executable, "-I", os.path.join(base, "cli", "omaq.py"), "--help"],
                                     capture_output=True, text=True, timeout=30)
-            self.assertEqual((result.returncode, result.stdout.startswith("usage: omaq-connect")), (0, True))
+            self.assertEqual((result.returncode, result.stdout.startswith("usage: harbor-connect")), (0, True))
             self.assertEqual([d for d, _, _ in os.walk(base) if os.path.basename(d) == "__pycache__"], [])
         finally:
             shutil.rmtree(base, ignore_errors=True)
@@ -358,7 +358,7 @@ class PackageA(Sandbox):
         app = cli.App("")
         app.link = FakeLink()
         app.handshake_request()
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": "j" * 32, "protocol": 16, "online": True})
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": "j" * 32, "protocol": 17, "online": True})
         self.assertEqual(app.link.ops("identity.ready"), [{"op": "identity.ready", "id": "j" * 32}])
         app.friends = [{"id": "0", "key": A, "name": "alice", "online": True, "status": "online"}]
         app.on_event({"event": "identity", "op": "import"})
@@ -934,7 +934,7 @@ class PackageA(Sandbox):
         self.assertEqual([(pane.conv, pane.draft) for pane in app.layout.panes()], before)
         self.assertEqual((len(app.link.ops("status")), app.chat.conv("0").loaded), (asked + 1, False))
         app.addr = "a" * 76
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": app.instance, "protocol": 16,
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": app.instance, "protocol": 17,
                       "addr": "b" * 76, "online": True})
         self.assertEqual([pane.draft for pane in app.layout.panes()], ["", ""])
         self.assertEqual(app.friends, [])
@@ -959,7 +959,7 @@ class PackageA(Sandbox):
         app.edit("key", "enter")
         rid = app.link.ops("invite.redeem")[-1]["id"]
         app.on_event({"event": "error", "code": "unsupported", "request": rid})
-        self.assertEqual(app.status, "That is not an OmaQ invite.")
+        self.assertEqual(app.status, "That is not a Harbor invite.")
         app.say("")
         app.invites.action_until = 0.0
         app.on_event({"event": "error", "code": "offline"})
@@ -967,7 +967,7 @@ class PackageA(Sandbox):
         app.edit("text", ":redeem omaq://x")
         app.edit("key", "enter")
         app.on_event({"event": "error", "code": "unsupported"})
-        self.assertEqual((app.status, app.invites.redeem_request), ("That is not an OmaQ invite.", ""))
+        self.assertEqual((app.status, app.invites.redeem_request), ("That is not a Harbor invite.", ""))
 
     def test_qr_is_white_on_black_and_checked(self):
         theme = os.path.join(os.environ["HOME"], ".local", "state", "omarchy", "current", "theme")
@@ -1184,7 +1184,7 @@ class PackageA(Sandbox):
                 f.truncate(size)
         app.edit("text", ":sendfile ~/big.bin")
         app.edit("key", "enter")
-        self.assertEqual((app.status, app.link.ops("file.send")), ("Files can be at most 8 MiB", []))
+        self.assertEqual((app.status, app.link.ops("file.send")), ("Files can be at most 1 GiB", []))
         app.edit("text", ":sendfile ~/fits.bin")
         app.edit("key", "enter")
         self.assertEqual(app.link.ops("file.send")[-1]["path"], os.path.join(home, "fits.bin"))
@@ -1613,7 +1613,7 @@ class PackageA(Sandbox):
         self.assertEqual((set(app.files.offers), set(app.files.sends)), ({"0"}, {"0"}))
         app.link = FakeLink()
         app.handshake_request()
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": app.instance, "protocol": 16,
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": app.instance, "protocol": 17,
                       "online": True})
         self.assertEqual(app.link.ops("file.status"), [{"op": "file.status", "conversation": "0", "id": rid, "key": A},
                                                        {"op": "file.status", "conversation": "0", "id": "in4", "key": A}])
@@ -1621,7 +1621,7 @@ class PackageA(Sandbox):
         app.drop_link()
         app.link = FakeLink()
         app.handshake_request()
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": "j" * 32, "protocol": 16, "online": True})
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": "j" * 32, "protocol": 17, "online": True})
         self.assertEqual((app.files.offers, app.files.sends, app.status), ({}, {}, "File transfer failed: helper_restarted"))
         self.assertEqual(cli.human_size(999), "999 B")
 
@@ -1636,7 +1636,7 @@ class PackageA(Sandbox):
                 if name.endswith(".py"):
                     with open(os.path.join(folder, name), encoding="utf-8") as f:
                         client += f.read()
-        for text in ("That is not an OmaQ invite.", "Finish active calls, transfers, invites, or read receipts first.",
+        for text in ("That is not a Harbor invite.", "Finish active calls, transfers, invites, or read receipts first.",
                      "Compare this code with your friend before accepting", "Another device used this invite link",
                      "Revoke this invite? It cannot be used again.",
                      "Invite checked. Waiting for the other person to accept.",
@@ -1655,7 +1655,7 @@ class PackageA(Sandbox):
         app = cli.App("")
         app.link = FakeLink()
         app.handshake_request()
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": "n" * 32, "protocol": 16, "online": True,
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": "n" * 32, "protocol": 17, "online": True,
                       "nickname": "mo"})
         app.command(":nickname")
         self.assertEqual(app.status, "Your nickname: mo")
@@ -1784,7 +1784,7 @@ class Blockers(Sandbox):
     def snapshot(self, app, instance=None):
         app.link = FakeLink()
         app.handshake_request()
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": instance or app.instance, "protocol": 16,
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": instance or app.instance, "protocol": 17,
                       "online": True})
 
     def offer(self, app, conversation, key, fid, name="old.txt"):
@@ -1885,7 +1885,7 @@ class Blockers(Sandbox):
         app.pane.draft = "draft"
         app.addr = "d" * 64 + "11111111" + "2222"
         app.handshake_request()
-        app.on_event({"event": "snapshot", "request": app.nonce, "instance": app.instance, "protocol": 16,
+        app.on_event({"event": "snapshot", "request": app.nonce, "instance": app.instance, "protocol": 17,
                       "addr": "d" * 64 + "33333333" + "4444", "online": True})
         self.assertEqual((app.pane.draft, len(app.friends), app.handshake), ("draft", 1, True))
         self.assertEqual(app.addr, "d" * 64 + "33333333" + "4444")
@@ -2023,7 +2023,7 @@ class Blockers(Sandbox):
 
             def read(self):
                 status = [o for o in sent if o.get("op") == "status"]
-                return [{"event": "snapshot", "request": status[-1]["id"], "instance": "k" * 32, "protocol": 16,
+                return [{"event": "snapshot", "request": status[-1]["id"], "instance": "k" * 32, "protocol": 17,
                          "online": True}] if status else []
 
             def fileno(self):
@@ -2767,7 +2767,7 @@ class IdentityActions(Sandbox):
     def test_export_to_a_new_path_needs_a_helper_that_keeps_files(self):
         app = self.ready()
         app.handshake, app.nonce = False, "n1"
-        app.on_event({"event": "snapshot", "request": "n1", "instance": "i" * 32, "protocol": 16, "historyClear": 2})
+        app.on_event({"event": "snapshot", "request": "n1", "instance": "i" * 32, "protocol": 17, "historyClear": 2})
         self.assertEqual(app.identity.export_version, 0)
         fresh = os.path.join(self.base, "fresh.save")
         self.typed(app, ":identity export %s" % fresh)
@@ -2780,7 +2780,7 @@ class IdentityActions(Sandbox):
         self.assertIs(sent["replace"], True)
         app.on_event({"event": "identity", "op": "export", "request": sent["id"], "path": existing})
         app.handshake, app.nonce = False, "n2"
-        app.on_event({"event": "snapshot", "request": "n2", "instance": "i" * 32, "protocol": 16, "historyClear": 2,
+        app.on_event({"event": "snapshot", "request": "n2", "instance": "i" * 32, "protocol": 17, "historyClear": 2,
                       "identityExport": 2})
         self.assertEqual(app.identity.export_version, 2)
         self.typed(app, ":identity export %s" % fresh)
@@ -3347,10 +3347,10 @@ class IdentityActions(Sandbox):
     def test_a_failed_runtime_marker_is_reported(self):
         app = self.ready()
         app.on_event({"event": "error", "code": "runtime_marker_failed"})
-        self.assertEqual(app.status, "Your identity change is saved, but OmaQ could not update its runtime file. Free some disk space, then restart OmaQ; until then, quitting may leave it running.")
+        self.assertEqual(app.status, "Your identity change is saved, but Harbor could not update its runtime file. Free some disk space, then restart Harbor; until then, quitting may leave it running.")
         app.say("")
         app.handshake, app.nonce = False, "n1"
-        app.on_event({"event": "snapshot", "request": "n1", "instance": "i" * 32, "protocol": 16, "historyClear": 2,
+        app.on_event({"event": "snapshot", "request": "n1", "instance": "i" * 32, "protocol": 17, "historyClear": 2,
                       "identityExport": 2})
         app.on_event({"event": "error", "code": "runtime_marker_failed"})
         self.assertEqual(app.status, cli.ERRORS["runtime_marker_failed"])

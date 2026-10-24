@@ -81,7 +81,7 @@ sink="omaq_p6_${owner}_cap_a"
 PULSE_SERVER="unix:$runtime/pulse/native" pactl info >/dev/null
 PULSE_SERVER="unix:$runtime/pulse/native" pactl load-module module-null-sink \
 	sink_name="$sink" \
-	sink_properties=device.description=OmaQ-Call-Test-Isolation >/dev/null
+	sink_properties=device.description=Harbor-Call-Test-Isolation >/dev/null
 if pactl list short sinks | grep -F "$sink" >/dev/null ||
    { command -v wpctl >/dev/null 2>&1 &&
      wpctl status -n 2>/dev/null | grep -F "$sink" >/dev/null; }; then

@@ -1,12 +1,13 @@
-PROTOCOL_MIN = 16
+PROTOCOL_MIN = 17
 
 
-LINE_MAX = 4096
+LINE_MAX = 65536 * 6 + 2048
 
 
-TEXT_MAX = 511
+TEXT_MAX = 65536
+PATH_MAX = 511
 REPLY_ID_MAX = 79
-FILE_MAX = 8 * 1024 * 1024
+FILE_MAX = 1024 * 1024 * 1024
 
 
 HISTORY_LIMIT = 50
@@ -64,9 +65,9 @@ INVITE_ERRORS = {
     "invite_rejected": "The invite could not be added. Create a fresh invite and try it once on the other device.",
     "nospam_rotate_failed": "The invite was cleared, but its one-use address could not be refreshed.",
     "safety_key_changed": "This contact's encryption identity changed. Remove the old contact state on both devices before exchanging a fresh invite.",
-    "direct_state_reinvite_required": "Your OmaQ identity and contacts are intact. Some older direct-chat encryption state was safely archived and requires fresh invites.",
+    "direct_state_reinvite_required": "Your Harbor identity and contacts are intact. Some older direct-chat encryption state was safely archived and requires fresh invites.",
     "group_registry_failed": "Could not safely save private group state.",
-    "unsupported": "That is not an OmaQ invite.",
+    "unsupported": "That is not a Harbor invite.",
     "busy": "Finish active calls, transfers, invites, or read receipts first.",
     "locked": "Unlock your identity to continue.",
 }

@@ -23,10 +23,11 @@
 
 #define OMAQ_AVATAR_DIMENSION_MAX 4096u
 #define OMAQ_AVATAR_DECODED_MAX (16u * 1024u * 1024u)
+#define HARBOR_IMAGE_DECODED_MAX (128u * 1024u * 1024u)
 #define OMAQ_AVATAR_CACHE_MAX 65
 
-_Static_assert(OMAQ_INLINE_IMAGE_SOURCE_MAX == OMAQ_FILE_MAX,
-	       "inline image and file-transfer limits must match");
+_Static_assert(OMAQ_INLINE_IMAGE_SOURCE_MAX <= OMAQ_FILE_MAX,
+	       "inline images must fit within the file-transfer limit");
 
 static struct {
 	int used;
@@ -177,15 +178,15 @@ static int read_private_image(const char *path, unsigned char **buffer, size_t *
 	return read_private_image_limited(path, buffer, size, OMAQ_AVATAR_MAX);
 }
 
-static int decoded_size_ok(uint32_t width, uint32_t height, size_t *bytes)
+static int decoded_size_ok(uint32_t width, uint32_t height, size_t *bytes, size_t maximum)
 {
 	uint64_t total;
 
-	if (width == 0 || height == 0 || width > OMAQ_AVATAR_DIMENSION_MAX ||
-	    height > OMAQ_AVATAR_DIMENSION_MAX)
+	if (width == 0 || height == 0 || width > (maximum > OMAQ_AVATAR_DECODED_MAX ? 8192u : OMAQ_AVATAR_DIMENSION_MAX) ||
+	    height > (maximum > OMAQ_AVATAR_DECODED_MAX ? 8192u : OMAQ_AVATAR_DIMENSION_MAX))
 		return 0;
 	total = (uint64_t)width * (uint64_t)height * 4u;
-	if (total > OMAQ_AVATAR_DECODED_MAX || total > SIZE_MAX)
+	if (total > maximum || total > SIZE_MAX)
 		return 0;
 	*bytes = (size_t)total;
 	return 1;
@@ -204,7 +205,7 @@ static void jpeg_fail(j_common_ptr common)
 }
 
 static int decode_png(const unsigned char *input, size_t input_size,
-		      unsigned char **rgba, uint32_t *width, uint32_t *height)
+		      unsigned char **rgba, uint32_t *width, uint32_t *height, size_t maximum)
 {
 	png_image image;
 	size_t bytes;
@@ -213,7 +214,7 @@ static int decode_png(const unsigned char *input, size_t input_size,
 	memset(&image, 0, sizeof(image));
 	image.version = PNG_IMAGE_VERSION;
 	if (!png_image_begin_read_from_memory(&image, input, input_size) ||
-	    !decoded_size_ok(image.width, image.height, &bytes)) {
+	    !decoded_size_ok(image.width, image.height, &bytes, maximum)) {
 		png_image_free(&image);
 		return -1;
 	}
@@ -236,7 +237,7 @@ static int decode_png(const unsigned char *input, size_t input_size,
 }
 
 static int decode_jpeg(const unsigned char *input, size_t input_size,
-		       unsigned char **rgba, uint32_t *width, uint32_t *height)
+		       unsigned char **rgba, uint32_t *width, uint32_t *height, size_t maximum)
 {
 	struct jpeg_decompress_struct jpeg;
 	struct jpeg_failure failure;
@@ -255,13 +256,13 @@ static int decode_jpeg(const unsigned char *input, size_t input_size,
 	created = 1;
 	jpeg_mem_src(&jpeg, input, input_size);
 	if (jpeg_read_header(&jpeg, TRUE) != JPEG_HEADER_OK ||
-	    !decoded_size_ok(jpeg.image_width, jpeg.image_height, &bytes))
+	    !decoded_size_ok(jpeg.image_width, jpeg.image_height, &bytes, maximum))
 		goto done;
 	jpeg.out_color_space = JCS_RGB;
 	if (!jpeg_start_decompress(&jpeg))
 		goto done;
 	if (jpeg.output_components != 3 ||
-	    !decoded_size_ok(jpeg.output_width, jpeg.output_height, &bytes))
+	    !decoded_size_ok(jpeg.output_width, jpeg.output_height, &bytes, maximum))
 		goto done;
 	decoded = malloc(bytes);
 	row = malloc((size_t)jpeg.output_width * 3u);
@@ -297,7 +298,7 @@ done:
 }
 
 static int decode_webp(const unsigned char *input, size_t input_size,
-		       unsigned char **rgba, uint32_t *width, uint32_t *height)
+		       unsigned char **rgba, uint32_t *width, uint32_t *height, size_t maximum)
 {
 	unsigned char *decoded;
 	size_t bytes;
@@ -305,7 +306,7 @@ static int decode_webp(const unsigned char *input, size_t input_size,
 
 	if (!WebPGetInfo(input, input_size, &image_width, &image_height) ||
 	    image_width <= 0 || image_height <= 0 ||
-	    !decoded_size_ok((uint32_t)image_width, (uint32_t)image_height, &bytes))
+	    !decoded_size_ok((uint32_t)image_width, (uint32_t)image_height, &bytes, maximum))
 		return -1;
 	decoded = malloc(bytes);
 	if (!decoded)
@@ -323,7 +324,7 @@ static int decode_webp(const unsigned char *input, size_t input_size,
 #endif
 
 static int decode_image(const unsigned char *input, size_t input_size,
-			unsigned char **rgba, uint32_t *width, uint32_t *height)
+			unsigned char **rgba, uint32_t *width, uint32_t *height, size_t maximum)
 {
 #ifndef HAVE_AVATAR_DECODERS
 	(void)input;
@@ -331,18 +332,19 @@ static int decode_image(const unsigned char *input, size_t input_size,
 	(void)rgba;
 	(void)width;
 	(void)height;
+	(void)maximum;
 	return -1;
 #else
 	if (!input || !rgba || !width || !height)
 		return -1;
 	*rgba = NULL;
 	if (input_size >= 8 && png_sig_cmp((png_bytep)input, 0, 8) == 0)
-		return decode_png(input, input_size, rgba, width, height);
+		return decode_png(input, input_size, rgba, width, height, maximum);
 	if (input_size >= 3 && input[0] == 0xff && input[1] == 0xd8 && input[2] == 0xff)
-		return decode_jpeg(input, input_size, rgba, width, height);
+		return decode_jpeg(input, input_size, rgba, width, height, maximum);
 	if (input_size >= 12 && memcmp(input, "RIFF", 4) == 0 &&
 	    memcmp(input + 8, "WEBP", 4) == 0)
-		return decode_webp(input, input_size, rgba, width, height);
+		return decode_webp(input, input_size, rgba, width, height, maximum);
 	return -1;
 #endif
 }
@@ -404,6 +406,7 @@ static int write_canonical_png_limited(const char *path, const unsigned char *rg
 	(void)rgba;
 	(void)width;
 	(void)height;
+	(void)maximum;
 	return -1;
 #else
 	png_image image;
@@ -661,7 +664,7 @@ int omaq_avatar_reconcile(const char *home, const char *id)
 	if (avatar_cache_matches(path, &status))
 		return 1;
 	if (read_private_image(path, &input, &input_size) != 0 ||
-	    decode_image(input, input_size, &rgba, &width, &height) != 0 ||
+	    decode_image(input, input_size, &rgba, &width, &height, OMAQ_AVATAR_DECODED_MAX) != 0 ||
 	    write_canonical_png(path, rgba, width, height) != 0 ||
 	    lstat(path, &status) != 0 || !S_ISREG(status.st_mode) ||
 	    avatar_cache_store(path, &status) != 0)
@@ -685,7 +688,7 @@ int omaq_avatar_validate_file(const char *path)
 	int rc = -1;
 
 	if (read_private_image(path, &input, &input_size) == 0 &&
-	    decode_image(input, input_size, &rgba, &width, &height) == 0)
+	    decode_image(input, input_size, &rgba, &width, &height, OMAQ_AVATAR_DECODED_MAX) == 0)
 		rc = 0;
 	free(rgba);
 	free(input);
@@ -701,7 +704,7 @@ int omaq_inline_image_validate_file(const char *path)
 
 	if (read_private_image_limited(path, &input, &input_size,
 				       OMAQ_INLINE_IMAGE_SOURCE_MAX) == 0 &&
-	    decode_image(input, input_size, &rgba, &width, &height) == 0)
+	    decode_image(input, input_size, &rgba, &width, &height, HARBOR_IMAGE_DECODED_MAX) == 0)
 		rc = 0;
 	free(rgba);
 	free(input);
@@ -717,9 +720,9 @@ int omaq_inline_image_import_file(const char *source, const char *destination)
 
 	if (read_private_image_limited(source, &input, &input_size,
 				       OMAQ_INLINE_IMAGE_SOURCE_MAX) == 0 &&
-	    decode_image(input, input_size, &rgba, &width, &height) == 0 &&
+	    decode_image(input, input_size, &rgba, &width, &height, HARBOR_IMAGE_DECODED_MAX) == 0 &&
 	    write_canonical_png_limited(destination, rgba, width, height,
-					OMAQ_FILE_MAX) == 0)
+					OMAQ_INLINE_IMAGE_SOURCE_MAX) == 0)
 		rc = 0;
 	free(rgba);
 	free(input);
@@ -745,7 +748,7 @@ int omaq_avatar_commit_received(const char *home, const char *id,
 	    (int)sizeof(directory) || mkdir_p(directory) != 0 ||
 	    omaq_avatar_dest(home, id, output, sizeof(output)) != 0 ||
 	    read_private_image(staging, &input, &input_size) != 0 ||
-	    decode_image(input, input_size, &rgba, &width, &height) != 0 ||
+	    decode_image(input, input_size, &rgba, &width, &height, OMAQ_AVATAR_DECODED_MAX) != 0 ||
 	    write_canonical_png(output, rgba, width, height) != 0)
 		goto done;
 	if (dest && destn && snprintf(dest, destn, "%s", output) >= (int)destn)
@@ -772,7 +775,7 @@ int omaq_avatar_install(const char *home, const char *id, const char *src,
 	    (int)sizeof(directory) || mkdir_p(directory) != 0 ||
 	    omaq_avatar_dest(home, id, output, sizeof(output)) != 0 ||
 	    read_private_image(src, &input, &input_size) != 0 ||
-	    decode_image(input, input_size, &rgba, &width, &height) != 0 ||
+	    decode_image(input, input_size, &rgba, &width, &height, OMAQ_AVATAR_DECODED_MAX) != 0 ||
 	    write_canonical_png(output, rgba, width, height) != 0)
 		goto done;
 	if (dest && destn && snprintf(dest, destn, "%s", output) >= (int)destn)
