@@ -182,7 +182,7 @@ BarWidget {
   readonly property color onlineStatusColor: "#7dce6a"
   readonly property bool primaryMenuOpen: root.inviteOpen || root.showJoin ||
     root.chatPickerOpen || root.settingsOpen || root.moreOpen || omaq.locked ||
-    omaq.incomingCall
+    omaq.incomingCall || root.nicknameFeedback !== ""
   readonly property int visibleUnreadCount: Math.max(omaq.unreadCount, omaq.localUnreadTotal())
   readonly property string currentSafetyCode:
     String(omaq.safetyConv || "") === String(omaq.selectedDirectId || "")
@@ -2747,6 +2747,12 @@ BarWidget {
           clip: true
           z: 20
 
+          // Disabled controls must not pass clicks to the card's dismiss/reset area.
+          MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+          }
+
           HoverHandler {
             id: pendingHeaderHover
             enabled: omaq.pending
@@ -2814,6 +2820,7 @@ BarWidget {
                   maximumLength: 36
                   text: omaq.selfNickname
                   onTextEdited: {
+                    root.nicknameEditOpen = true
                     omaq.clearRequestError(root.nicknameFeedbackRequest)
                     root.nicknameFeedback = ""
                     root.nicknameFeedbackRequest = ""
@@ -2824,20 +2831,6 @@ BarWidget {
                   }
                   onAccepted: if (nicknameButton.enabled) nicknameButton.clicked()
 
-                  Controls.ToolTip {
-                    id: nicknameFeedbackTooltip
-                    visible: (omaq.selfNickname === "" || root.nicknameEditOpen) &&
-                      root.nicknameFeedback !== ""
-                    text: root.nicknameFeedback
-                    delay: 0
-                    timeout: -1
-                    contentItem: SafeText {
-                      text: nicknameFeedbackTooltip.text
-                      color: root.nicknameFeedbackError ? root.urgent : root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.bodySmall
-                    }
-                  }
                 }
                 TokenButton {
                   id: nicknameButton
@@ -2851,7 +2844,7 @@ BarWidget {
                   fontFamily: root.fontFamily
                   tooltipText: "Save nickname"
                   accessibleName: "Save nickname"
-                  enabled: omaq.supportsIdentityActions && !root.nicknameSubmitPending &&
+                  enabled: !root.nicknameSubmitPending &&
                     omaq.nicknameValid(nicknameField.text)
                   onClicked: {
                     if (root.nicknameSubmitPending || !nicknameButton.enabled)
@@ -2869,7 +2862,11 @@ BarWidget {
                     if (root.nicknameSubmitPending) {
                       nicknameSubmitTimer.restart()
                     } else {
-                      root.nicknameFeedback = "Harbor is not ready to update the nickname."
+                      root.nicknameFeedback = omaq.locked
+                        ? root.errorText("locked")
+                        : omaq.helperCompatibility === "incompatible"
+                          ? root.errorText("helper_incompatible")
+                          : "Harbor's helper is not ready. Finish installation or check the helper status."
                       root.nicknameFeedbackError = true
                       root.nicknameRequest = ""
                     }
@@ -4183,14 +4180,14 @@ BarWidget {
           }
 
           SafeText {
-            visible: root.settingsPersistenceWarning !== "" ||
+            visible: root.nicknameFeedback !== "" || root.settingsPersistenceWarning !== "" ||
               omaq.unreadWarning !== "" ||
               (chatSurface && chatSurface.autoOpenWarning !== "") ||
               (omaq.lastError !== "" && !(omaq.locked && omaq.lastError === "locked") &&
                !root.contextualErrorHandled)
             width: parent.width
-            text: root.settingsPersistenceWarning !== ""
-              ? root.settingsPersistenceWarning
+            text: root.nicknameFeedback !== "" ? root.nicknameFeedback
+              : root.settingsPersistenceWarning !== "" ? root.settingsPersistenceWarning
               : (omaq.lastError !== "" && !(omaq.locked && omaq.lastError === "locked") &&
                  !root.contextualErrorHandled
                 ? root.errorText(omaq.lastError)

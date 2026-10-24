@@ -20,12 +20,12 @@ QML_POLICY_SHA256 = {
     "CallTone.qml": "12d873ec1b774ed038fb526b0b2b7fd2a1a71e97d9987aa27fef06f6f4d93ddc",
     "ChatSurface.qml": "44d7e94d20a4a771705d37c8efbdb36c26bb90f3b3500b3aec8e370f20b78fb6",
     "MaterialSymbols.qml": "61ba207e579acabc5c5a842d9c8cd39bf8773f3b4b617951f09c4d373adb9629",
-    "Panel.qml": "8232838bab41514a228d112fb655174d14091f143ed0cf2ce66e98625d2d1837",
+    "Panel.qml": "63710d683f6ca463dc3d953f38ecc94c1403b9f3df81cf3fb02764a32c768c35",
     "PlacementController.qml": "87b297b7d63b939812d4f1a436b98e494446a618b6950c43d590c84562fae71f",
     "SafeText.qml": "a8bfa2ea5e13cbd50bf7e9c70995bea06ceeaca9c9d61e63b243ce18a830e354",
     "Service.qml": "bb9d37d43b99a2bfcae751415079df28c317fa34d0f507d4fd0de927cac19da6",
     "SurfaceCoordinator.qml": "c206242de180c0b3a02b5ac50af9ba7e2486be1b0f585ed6ab8983979b0666f0",
-    "pages/ChatPage.qml": "95baf521448c7a7a8296b27e7a6cf6c1d71d47650ce9fe8f85b63a9c3fb288b3",
+    "pages/ChatPage.qml": "1dd498a0b14e2aa4f1f47e431a2b86f58c73bd1e3f1e646cf262563386be51d4",
 }
 TEXT_KINDS = (
     "Controls.TextArea",
@@ -147,9 +147,9 @@ REVIEWED_COMPUTED_IDS = set().union(*COMPUTED_WRITE_ALLOWLIST.values())
 COMPUTED_WRITE_SOURCE_SHA256 = {
     "CallTone.qml": "8d9a0af95e58b888dfd09e37c198684843aa10d306f815abc868b88c61496c86",
     "ChatSurface.qml": "72b1ad04de06bf4e0752f2bb47a7b36cdedcdeccc2e6f645daf9c911de5134ac",
-    "Panel.qml": "8c4d6149f70c21ba36c52c512c7b689f67a8d409a25caf3531d1e394eaf91214",
+    "Panel.qml": "8c15dae1073d6941990380539b29aca2c7871ddc37ff2be5bc32f52e973d06be",
     "Service.qml": "644497aa6de0b05ed93d3d84202a8ba77c4cd044632c99f1ec8e151c629f3040",
-    "pages/ChatPage.qml": "7b6515d13e4364d03df11445feb08621397b9621742e3bb51fd8de039d66fbb2",
+    "pages/ChatPage.qml": "b559f7afa5864eb885d79aaf6fd1f96fd1f9516b761bdd25f877681c674b6316",
 }
 REVIEWED_MODEL_MUTATION_IDS = {
     "pages/ChatPage.qml": {"groupReceiptModel"},
@@ -207,7 +207,7 @@ EXPECTED_PLAIN = {
     "Controls.TextArea": "TextEdit.PlainText",
 }
 ALLOWED_EXTERNAL_LABEL_REFS = {
-    "ChatBtn": {"root.groupInviteFriendId"},
+    "ChatBtn": {"root.groupInviteFriendId", "imagePreview.zoomed"},
     "FormatBtn": set(),
     "EmojiPickerBtn": set(),
     "SurfaceBtn": {"pinPage.autoOpenEnabled", "root.muted"},

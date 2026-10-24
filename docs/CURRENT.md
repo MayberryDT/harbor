@@ -1,5 +1,17 @@
 # Harbor fork status
 
+Image preview fix (24 October 2026, not deployed): image clicks now open a
+conversation-local preview with Zoom in/Fit, scrolling, Close and Escape.
+This avoids the reproduced imv-wayland crash without changing the default
+viewer. Missing files show a readable error; drafts survive dismissal and
+contact changes dismiss the preview. See [verification](stages/image-preview.md).
+
+Nickname draft fix (24 October 2026, not deployed): clicking Save while the
+helper was unavailable fell through the disabled button to the panel's dismiss
+handler and erased the draft. The header now absorbs those clicks, active edits
+survive profile refreshes, and valid submissions show helper-readiness feedback
+in the lower frame. See [verification and remaining limits](stages/nickname-draft.md).
+
 Harbor expands text to 64 KiB, files to 1 GiB and inline images to 64 MiB;
 see [Harbor implementation and evidence](HARBOR.md). The following retained
 upstream status describes the starting point; its historical limits are superseded.

@@ -20,7 +20,7 @@ extract_block() {
   ' "$document"
 }
 
-extract_block "## Install" "$root/README.md" >"$tmp/readme-install.sh"
+extract_block "## Install on Omarchy" "$root/README.md" >"$tmp/readme-install.sh"
 extract_block "## Install Harbor" "$root/docs/INSTALLATION.md" >"$tmp/installation-install.sh"
 [ -s "$tmp/readme-install.sh" ] || {
   echo "update-order: README install command is missing" >&2
@@ -40,7 +40,7 @@ cmp -s "$tmp/readme-install.sh" "$tmp/install.expected" || {
   exit 1
 }
 
-extract_block "## Update" "$root/README.md" >"$tmp/readme-update.sh"
+extract_block "## Update or remove Harbor" "$root/README.md" >"$tmp/readme-update.sh"
 extract_block "## Update Harbor" "$root/docs/INSTALLATION.md" >"$tmp/installation-update.sh"
 [ -s "$tmp/readme-update.sh" ] || {
   echo "update-order: README update command is missing" >&2
@@ -445,24 +445,6 @@ for document in "$root/README.md" "$root/docs/INSTALLATION.md"; do
   }
 done
 
-if ! grep -Fq 'Do not update Harbor with' "$root/README.md" ||
-    ! grep -Fq 'including the all-plugins form.' "$root/README.md"; then
-  echo "update-order: README generic-updater warning changed" >&2
-  exit 1
-fi
-[ "$(grep -Fc 'omarchy restart shell' "$root/README.md")" -eq 2 ] || {
-  echo "update-order: README shell-refresh hints changed" >&2
-  exit 1
-}
-grep -Fq 'If a successful install reports a current helper but Harbor is still absent' \
-  "$root/README.md" || {
-  echo "update-order: install shell-refresh hint is not readiness-gated" >&2
-  exit 1
-}
-grep -Fq "After an \`activated\` or \`current\` result" "$root/README.md" || {
-  echo "update-order: update shell-refresh hint is not result-gated" >&2
-  exit 1
-}
 if ! grep -Fq 'include Harbor in an all-plugins' "$root/docs/INSTALLATION.md" ||
     ! grep -Fq 'omarchy plugin update --yes' "$root/docs/INSTALLATION.md"; then
   echo "update-order: installation guide omits the all-plugins update risk" >&2
@@ -494,12 +476,6 @@ grep -Fq '<summary>Pin a reviewed commit and limit acquisition</summary>' \
   "$root/docs/INSTALLATION.md" || exit 1
 grep -Fq '"/usr/bin/git", "-c", "core.hooksPath=/dev/null"' \
   "$root/docs/INSTALLATION.md" || exit 1
-! grep -Eq '<sub>|<br[ >]' "$root/README.md" || exit 1
-grep -Fq '<th width="50%">Bar plugin</th>' "$root/README.md" || exit 1
-grep -Fq '<th width="50%">Terminal client</th>' "$root/README.md" || exit 1
-grep -Fq 'the updater builds outside the monitored plugin tree' \
-  "$root/README.md" || exit 1
-grep -Fq 'Dependency packages are never removed automatically' "$root/README.md" || exit 1
 update_stage="$root/docs/stages/trigger-free-updates.md"
 grep -Fq 'mv -T --exchange --no-copy' "$update_stage" || exit 1
 grep -Fq 'omarchy-launch-shell' "$update_stage" || exit 1

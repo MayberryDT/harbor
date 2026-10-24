@@ -2394,8 +2394,107 @@ FocusScope {
 
   function openImage(path) {
     var selectedPath = String(path || "")
-    if (selectedPath)
-      Quickshell.execDetached(["xdg-open", selectedPath])
+    if (!selectedPath)
+      return
+    imagePreview.path = selectedPath
+    imagePreview.open()
+  }
+
+  Controls.Popup {
+    id: imagePreview
+    property string path: ""
+    property bool zoomed: false
+    parent: root
+    width: root.width
+    height: root.height
+    padding: Style.space(12)
+    modal: true
+    dim: false
+    focus: true
+    closePolicy: Controls.Popup.CloseOnEscape
+    onOpened: {
+      zoomed = false
+      previewScroll.contentX = 0
+      previewScroll.contentY = 0
+      previewClose.forceActiveFocus()
+    }
+    onClosed: {
+      path = ""
+      input.forceActiveFocus()
+    }
+    background: Rectangle {
+      color: root.bg
+      radius: Style.cornerRadius
+      border.width: 1
+      border.color: root.accent
+    }
+    contentItem: ColumnLayout {
+      spacing: Style.space(8)
+      RowLayout {
+        Layout.fillWidth: true
+        Harbor.SafeText {
+          Layout.fillWidth: true
+          text: "Image"
+          color: root.fg
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+        ChatBtn {
+          text: imagePreview.zoomed ? "Fit" : "Zoom in"
+          enabled: previewImage.status === Image.Ready
+          onClicked: {
+            imagePreview.zoomed = !imagePreview.zoomed
+            previewScroll.contentX = 0
+            previewScroll.contentY = 0
+          }
+        }
+        ChatBtn {
+          id: previewClose
+          text: "Close"
+          onClicked: imagePreview.close()
+        }
+      }
+      Item {
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        Flickable {
+          id: previewScroll
+          anchors.fill: parent
+          clip: true
+          contentWidth: Math.max(width, previewImage.width)
+          contentHeight: Math.max(height, previewImage.height)
+          boundsBehavior: Flickable.StopAtBounds
+          Controls.ScrollBar.horizontal: Controls.ScrollBar {}
+          Controls.ScrollBar.vertical: Controls.ScrollBar {}
+          Image {
+            id: previewImage
+            x: Math.max(0, (previewScroll.width - width) / 2)
+            y: Math.max(0, (previewScroll.height - height) / 2)
+            width: imagePreview.zoomed ? implicitWidth : previewScroll.width
+            height: imagePreview.zoomed ? implicitHeight : previewScroll.height
+            source: imagePreview.visible ? root.localFileUrl(imagePreview.path) : ""
+            // Keep 4K screenshots readable while bounding decoded memory.
+            sourceSize.width: 4096
+            sourceSize.height: 4096
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            cache: false
+            smooth: true
+          }
+        }
+        Harbor.SafeText {
+          anchors.centerIn: parent
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          visible: previewImage.status !== Image.Ready
+          text: previewImage.status === Image.Error ? "Image unavailable" : "Loading image…"
+          color: root.fg
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+      }
+    }
   }
 
   function insertEmoji(glyph) {
@@ -3103,6 +3202,7 @@ FocusScope {
   }
 
   onConversationChanged: {
+    imagePreview.close()
     root.stopTyping()
     root.searchOpen = false
     root.resetSearchResults()
@@ -3146,6 +3246,7 @@ FocusScope {
   }
 
   onPeerKeyChanged: {
+    imagePreview.close()
     root.searchOpen = false
     root.resetSearchResults()
     if (chatSearchField)
@@ -3157,6 +3258,7 @@ FocusScope {
 
   onDirectBindingValidChanged: {
     if (!root.directBindingValid) {
+      imagePreview.close()
       root.stopTyping()
       root.searchOpen = false
       root.resetSearchResults()
