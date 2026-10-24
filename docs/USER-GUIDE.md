@@ -140,7 +140,7 @@ Delayed events never change Read back to Delivered or Sent. The **New messages**
 
 ## Exchange files and images
 
-DirectChat uses Tox friend-file transfers. Incoming files remain paused until the recipient accepts them, and the default download directory is `~/Downloads/omaq/`.
+DirectChat uses Tox friend-file transfers. Incoming files remain paused until the recipient accepts them, and the default download directory is `~/Downloads/Harbor/`.
 
 <table>
 <thead><tr><th>Select a file</th><th>Accept a file</th><th>Preview an image</th><th>File actions</th></tr></thead>
@@ -154,7 +154,7 @@ DirectChat uses Tox friend-file transfers. Incoming files remain paused until th
 
 Image bubbles use a 56×56 preview and open the complete local file when selected. Harbor fully decodes and canonically rewrites incoming images before displaying them. Video files remain ordinary downloads without inline previews, while received audio files provide Play and Pause controls.
 
-The helper limits attachments to 1 GiB, rejects symlink destinations, and writes accepted downloads with private permissions. Override the destination with `OMAQ_DOWNLOAD_DIR` or `XDG_DOWNLOAD_DIR`.
+The helper limits attachments to 1 GiB, rejects symlink destinations, and writes accepted downloads with private permissions. Override the destination with `HARBOR_DOWNLOAD_DIR` or `XDG_DOWNLOAD_DIR` (`OMAQ_DOWNLOAD_DIR` remains a compatibility alias).
 
 ## Make DirectChat voice calls
 
@@ -248,7 +248,7 @@ The focused pane starts its header with `❯`, and the input line shows the frie
 | `:accept` / `:decline` | Answer the pending request |
 | `:nickname <name>` | Change the name your friends see; `:nickname` alone shows it |
 | `:sendfile <path>` | Send a file to this chat; `Tab` lists your folders and files |
-| `:acceptfile` / `:declinefile` | Save the offered file in `~/Downloads/omaq`, or decline it |
+| `:acceptfile` / `:declinefile` | Save the offered file in `~/Downloads/Harbor`, or decline it |
 | `:cancelfile` | Cancel the file transfer in this chat, sending or receiving |
 | `:quit` or `:q` | Quit |
 
@@ -291,7 +291,7 @@ Run `:sendfile ~/notes.pdf` to send a file to the open chat. A path relative to 
 
 To pick the file instead of typing its whole path, type `:sendfile ~/` and press `Tab`. A list above the input line shows the folders and files in that folder, folders first and files with their size. Typing filters it, `Up`/`Down` choose, `Tab` or `Enter` opens a folder or takes a file into the line, `Left` goes back, and `Esc` closes the list. The next `Enter` sends the file. Hidden files appear once the name you type starts with `.`.
 
-An incoming file waits until you decide: the chat shows `File offer: notes.pdf (2.3 MB)`. `:acceptfile` saves it in `~/Downloads/omaq`, shows `Receiving notes.pdf` with the same bar while it arrives, and then shows the full path. `:declinefile` rejects it, and `:cancelfile` stops it while it arrives.
+An incoming file waits until you decide: the chat shows `File offer: notes.pdf (2.3 MB)`. `:acceptfile` saves it in `~/Downloads/Harbor`, shows `Receiving notes.pdf` with the same bar while it arrives, and then shows the full path. `:declinefile` rejects it, and `:cancelfile` stops it while it arrives.
 
 ### Emoji, receipts, and text size
 

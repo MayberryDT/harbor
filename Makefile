@@ -10,6 +10,7 @@ PKG_CONFIG ?= pkg-config
 TOX_OK := $(shell $(PKG_CONFIG) --exists libtoxcore && echo yes || \
 	($(PKG_CONFIG) --exists toxcore && echo yes || echo no))
 SIG_OK := $(shell $(PKG_CONFIG) --exists libsignal-protocol-c && echo yes || echo no)
+SQLITE_OK := $(shell $(PKG_CONFIG) --exists sqlite3 && echo yes || echo no)
 PULSE_OK := $(shell $(PKG_CONFIG) --exists libpulse && echo yes || echo no)
 IMAGE_OK := $(shell $(PKG_CONFIG) --exists libpng libjpeg libwebp && echo yes || echo no)
 
@@ -25,6 +26,8 @@ ifeq ($(SIG_OK),yes)
   CFLAGS += $(shell $(PKG_CONFIG) --cflags libsignal-protocol-c)
   TOX_LIBS += $(shell $(PKG_CONFIG) --libs libsignal-protocol-c)
   TOX_LIBS += $(shell $(PKG_CONFIG) --libs libcrypto)
+  CFLAGS += $(shell $(PKG_CONFIG) --cflags sqlite3 2>/dev/null)
+  TOX_LIBS += $(shell $(PKG_CONFIG) --libs sqlite3 2>/dev/null)
 endif
 
 ifeq ($(IMAGE_OK),yes)
@@ -47,7 +50,7 @@ LIB_SRC := helper/harbor_transport.c helper/invite.c helper/roles.c helper/conve
 	helper/surface.c helper/sound.c helper/file.c helper/avatar.c helper/av.c \
 	helper/presence.c helper/receipt.c helper/message_action.c helper/direct_state.c \
 	helper/ratchet.c helper/ratchet_pin.c helper/ratchet_adapt.c helper/send_queue.c
-HELPER_SRC := $(LIB_SRC) helper/omaq.c
+HELPER_SRC := $(LIB_SRC) helper/devices.c helper/device_link.c helper/device_sync.c helper/journal.c helper/person_chat.c helper/endpoint.c helper/omaq.c
 TEST_SRC := tests/omaq_test.c helper/invite.c helper/roles.c helper/conversation.c helper/auto_open.c \
 	helper/group_file.c helper/group_file_store.c helper/json_io.c helper/text.c helper/line_reader.c helper/store.c helper/message.c helper/identity.c \
 	helper/identity_guard.c \
@@ -154,39 +157,43 @@ $(BIN_GROUP_ADMIN_TEST_HELPER): check-signal $(HELPER_SRC)
 
 check-tox:
 	@if [ "$(TOX_OK)" != "yes" ]; then \
-		echo "omaq: toxcore is required for the CI test suite" >&2; \
+		echo "harbor: toxcore is required for the CI test suite" >&2; \
 		exit 1; \
 	fi
 
 check-signal:
 	@if [ "$(SIG_OK)" != "yes" ]; then \
-		echo "omaq: libsignal-protocol-c is required for direct-message encryption" >&2; \
-		echo "omaq: install it before running 'make helper'" >&2; \
+		echo "harbor: libsignal-protocol-c is required for direct-message encryption" >&2; \
+		echo "harbor: install it before running 'make helper'" >&2; \
+		exit 1; \
+	fi
+	@if [ "$(SQLITE_OK)" != "yes" ]; then \
+		echo "harbor: sqlite is required for private conversation history" >&2; \
 		exit 1; \
 	fi
 
 check-audio:
 	@if [ "$(PULSE_OK)" != "yes" ]; then \
-		echo "omaq: libpulse is required for voice calls" >&2; \
-		echo "omaq: install libpulse before running 'make helper'" >&2; \
+		echo "harbor: libpulse is required for voice calls" >&2; \
+		echo "harbor: install libpulse before running 'make helper'" >&2; \
 		exit 1; \
 	fi
 
 check-images:
 	@if [ "$(IMAGE_OK)" != "yes" ]; then \
-		echo "omaq: libpng, libjpeg and libwebp are required for safe avatar decoding" >&2; \
+		echo "harbor: libpng, libjpeg and libwebp are required for safe avatar decoding" >&2; \
 		exit 1; \
 	fi
 
 check-node:
 	@if ! command -v node >/dev/null 2>&1; then \
-		echo "omaq: Node.js is required for the CI test suite" >&2; \
+		echo "harbor: Node.js is required for the CI test suite" >&2; \
 		exit 1; \
 	fi
 
 check-qml:
 	@if [ ! -x /usr/lib/qt6/bin/qml ] || [ ! -x /usr/lib/qt6/bin/qmlformat ]; then \
-		echo "omaq: Qt 6 qml and qmlformat are required for the CI test suite" >&2; \
+		echo "harbor: Qt 6 qml and qmlformat are required for the CI test suite" >&2; \
 		exit 1; \
 	fi
 
@@ -427,3 +434,7 @@ clean:
 		$(BIN_TOX_RELAY_RETRY_TEST) $(BIN_TOX_NAME_TEST) $(BIN_TOX_NAME_IPC_HELPER) \
 		$(BIN_IPC_TEST_HELPER) \
 		$(BIN_GROUP_ADMIN_TEST_HELPER) $(BIN_HELP)
+
+# Native process-crash E2E only; production helper has no fault controls.
+tests/harbor-sync-fault-helper: $(HELPER_SRC)
+	$(CC) $(CFLAGS) $(HARDEN_CFLAGS) $(HARDEN_LDFLAGS) -DHARBOR_SYNC_FAULTS -o $@ $(HELPER_SRC) $(TOX_LIBS)

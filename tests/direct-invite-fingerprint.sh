@@ -111,7 +111,7 @@ for marker in (
         raise SystemExit(f"direct-invite-fingerprint: Service lost {marker!r}")
 
 pending_start = panel.index("              id: pendingRequestContent")
-pending_end = panel.index("        Rectangle {\n          id: supportLinks", pending_start)
+pending_end = panel.index("        Connections {", pending_start)
 pending = panel[pending_start:pending_end]
 for marker in (
     'text: omaq.pendingGroup ? "Group invite" : "Friend request"',

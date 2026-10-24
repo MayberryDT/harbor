@@ -69,6 +69,9 @@ int omaq_invite_parse(const char *url, omaq_invite *out);
 /* Write URL. Returns 0 or -1. */
 int omaq_invite_format(const omaq_invite *inv, char *buf, size_t buflen);
 
+/* Normalize a validated URL, preserving the Harbor/legacy input scheme. */
+int omaq_invite_normalize(const char *url, char *buf, size_t buflen);
+
 bool omaq_invite_expired(const omaq_invite *inv, int64_t now);
 
 #endif

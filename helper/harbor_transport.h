@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #define HARBOR_TEXT_MAX 65536u
-#define HARBOR_PLAIN_MAX (HARBOR_TEXT_MAX + 256u)
+#define HARBOR_PLAIN_MAX (HARBOR_TEXT_MAX + 1024u)
 #define HARBOR_WIRE_MAX (HARBOR_PLAIN_MAX * 2u + 2048u)
 #define HARBOR_ESC_MAX (HARBOR_TEXT_MAX * 6u + 1u)
 #define HARBOR_EVENT_MAX (HARBOR_ESC_MAX + 2048u)

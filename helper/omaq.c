@@ -1,7 +1,13 @@
 #define _DEFAULT_SOURCE
 
+#if defined(HAVE_TOX) && defined(HAVE_SIGNAL)
+#define HARBOR_UI_CAPABILITIES "\"bearerInvites\":true,\"deviceManagement\":1,"
+#else
+#define HARBOR_UI_CAPABILITIES "\"bearerInvites\":false,\"deviceManagement\":0,"
+#endif
+
 #if defined(HAVE_TOX) && !defined(HAVE_SIGNAL)
-#error "OmaQ Tox transport requires Signal Ratchet support"
+#error "Harbor Tox transport requires Signal Ratchet support"
 #endif
 
 #include "av.h"
@@ -28,10 +34,17 @@
 #include "send_queue.h"
 #include "sound.h"
 #include "store.h"
+#include "text.h"
 #include "stdout_spool.h"
 #include "state_archive.h"
 #include "surface.h"
 
+#include "devices.h"
+#include "device_link.h"
+#include "endpoint.h"
+#include "device_sync.h"
+#include "people.h"
+#include "person_chat.h"
 #include "identity.h"
 #include "identity_guard.h"
 #ifdef HAVE_TOX
@@ -223,6 +236,8 @@ static int64_t g_send_queue_check_ms;
 static omaq_pending_invite g_pending_invite;
 static omaq_invite_conflicts g_invite_conflicts;
 static int g_pending_announced;
+static int g_issued_bearer;
+static int g_bearer_accept_pending;
 #ifdef HAVE_SIGNAL
 _Static_assert(OMAQ_INVITE_RATCHET_KEY_HEX == OMAQ_RK_HEX,
 	       "pending invite Ratchet key size mismatch");
@@ -573,13 +588,15 @@ static int init_instance_id(void)
 
 static const char *home_dir(void)
 {
-	const char *h = getenv("OMAQ_HOME");
+	const char *h = getenv("HARBOR_HOME");
+    if (!h || !h[0]) h = getenv("OMAQ_HOME");
 	return h && h[0] ? h : NULL;
 }
 
 static const char *state_dir(void)
 {
-	const char *h = getenv("OMAQ_STATE");
+	const char *h = getenv("HARBOR_STATE");
+    if (!h || !h[0]) h = getenv("OMAQ_STATE");
 	return h && h[0] ? h : NULL;
 }
 
@@ -912,6 +929,10 @@ static int direct_conversation_key(const char *conversation, char *key,
 	return omaq_tox_friend_pk_hex(g_tox, direct_id_number(conversation), key);
 }
 
+#ifdef HAVE_SIGNAL
+static int friend_has_pin(uint32_t friend);
+static int friend_application_allowed(uint32_t friend);
+#endif
 static int direct_operation_binding_matches(const omaq_op *op)
 {
 	char current[65];
@@ -920,6 +941,13 @@ static int direct_operation_binding_matches(const omaq_op *op)
 	    direct_conversation_key(op->conversation, current, sizeof(current)) != 0 ||
 	    strcmp(current, op->key) != 0)
 		return 0;
+#ifdef HAVE_SIGNAL
+    int local = !strcmp(op->op,"history") || !strcmp(op->op,"search") ||
+        !strcmp(op->op,"history.clear") || !strcmp(op->op,"surface.get") ||
+        !strcmp(op->op,"surface.set") || !strcmp(op->op,"file.status") ||
+        !strcmp(op->op,"file.cancel") || !strcmp(op->op,"call.stop");
+    if(!local && !friend_application_allowed(direct_id_number(op->conversation)))return 0;
+#endif
 	if (strcmp(op->op, "file.accept") == 0 || strcmp(op->op, "file.cancel") == 0) {
 		uint32_t friend, file_number;
 		if (omaq_file_id_parse(op->id, &friend, &file_number) != 0 ||
@@ -1008,9 +1036,159 @@ static int ratchet_encrypt_friend(uint32_t friend, const char *plain,
 {
 	char peer[OMAQ_DIRECT_STATE_ID_MAX];
 
-	return direct_state_for_friend(friend, peer, sizeof(peer)) != 0 ? -1 :
+	return !friend_application_allowed(friend) ||
+        direct_state_for_friend(friend, peer, sizeof(peer)) != 0 ? -1 :
 		omaq_ratchet_encrypt(g_ratchet, peer, plain, wire, wire_size);
 }
+#endif
+
+#if defined(HAVE_TOX) && defined(HAVE_SIGNAL)
+static struct harbor_link g_device_link;
+static struct harbor_endpoint g_endpoint;
+static int endpoint_exists(const char *key);
+static int endpoint_pin(const char *key,char pin[65]);
+static int endpoint_connect(const char *key);
+static int endpoint_promote(const char *key,const char *pin);
+static int endpoint_remove(const char *key);
+static int endpoint_send(const char *key,const char *metadata);
+static int endpoint_owned(const char *key);
+static void rendezvous_tick(void);
+static int friend_has_pin(uint32_t friend) {
+    char key[65],stored[67],pin[65];
+    return g_tox && !omaq_tox_friend_pk_hex(g_tox,friend,key) &&
+        snprintf(stored,sizeof(stored),"d:%s",key)==66 &&
+        omaq_ratchet_pin_get(home_dir(),stored,pin,sizeof(pin))==1;
+}
+static struct harbor_sync g_device_sync;
+static struct harbor_person_chat g_person_chat;
+static int g_device_roster_changed = 1;
+static int64_t g_device_roster_retry;
+static unsigned char g_device_roster_head[32];
+static void device_reconcile(void);
+static void people_reconcile(const struct harbor_devices *own);
+static void people_receive(uint32_t friend,const char *text);
+static int device_sync_apply(const struct harbor_sync_event *event,int fresh);
+static void emit_people(const char *request);
+static char g_person_capable[OMAQ_DIRECT_STATE_FRIEND_MAX][65];
+static int person_capable(const char *key)
+{
+    for(size_t i=0;i<OMAQ_DIRECT_STATE_FRIEND_MAX;i++)if(!strcmp(g_person_capable[i],key))return 1;
+    return 0;
+}
+static int person_note_capability(const char *key)
+{
+    if(person_capable(key))return 0;
+    for(size_t i=0;i<OMAQ_DIRECT_STATE_FRIEND_MAX;i++)if(!g_person_capable[i][0]){
+        snprintf(g_person_capable[i],65,"%s",key);g_device_roster_retry=0;return 1;
+    }
+    return 0;
+}
+static void device_link_emit(const char *event)
+{
+    emit(event);
+    if (strstr(event,"\"state\":\"sent\"") || strstr(event,"\"state\":\"linked\""))
+        g_device_roster_changed = 1;
+}
+static int device_cipher_send(const char *key,const char *cipher)
+{
+    char stored[OMAQ_DIRECT_STATE_ID_MAX];uint32_t friend;
+    if(snprintf(stored,sizeof(stored),"d:%s",key)>=(int)sizeof(stored) ||
+        friend_for_direct_state(stored,&friend) || !omaq_tox_friend_online(g_tox,friend))return -1;
+    return omaq_tox_send(g_tox,friend,cipher);
+}
+static int device_peer_available(const char *key)
+{
+    char stored[OMAQ_DIRECT_STATE_ID_MAX];uint32_t friend;
+    if(snprintf(stored,sizeof(stored),"d:%s",key)>=(int)sizeof(stored) ||
+       friend_for_direct_state(stored,&friend))return 0;
+    return omaq_tox_friend_online(g_tox,friend);
+}
+static int device_peer_pin(const char *key,char out[65])
+{
+    char stored[OMAQ_DIRECT_STATE_ID_MAX];
+    if(snprintf(stored,sizeof(stored),"d:%s",key)>=(int)sizeof(stored))return -1;
+    return omaq_ratchet_pin_get(home_dir(),stored,out,65)==1?0:-1;
+}
+static int device_link_send(const char *key, const char *plain)
+{
+    char stored[OMAQ_DIRECT_STATE_ID_MAX], wire[HARBOR_WIRE_MAX + 1];
+    uint32_t friend;
+    if (snprintf(stored, sizeof(stored), "d:%s", key) >= (int)sizeof(stored) ||
+        friend_for_direct_state(stored, &friend) != 0 ||
+        !omaq_tox_friend_online(g_tox,friend) || !ratchet_has_session_friend(friend) ||
+        omaq_ratchet_encrypt(g_ratchet, stored, plain, wire, sizeof(wire)) != 0)
+        return -1;
+    return omaq_tox_send(g_tox, friend, wire);
+}
+static int device_link_prepare(void)
+{
+    char transport[65], ratchet[65];
+    if (!g_tox || !g_ratchet || omaq_tox_self_pk_hex(g_tox, transport) ||
+        omaq_ratchet_local_rk(g_ratchet, ratchet)) return -1;
+    if (g_device_link.home && (strcmp(transport,g_device_link.transport) ||
+        strcmp(ratchet,g_device_link.ratchet))) {
+        harbor_sync_close(&g_device_sync);
+        memset(&g_device_link,0,sizeof(g_device_link));memset(&g_device_sync,0,sizeof(g_device_sync));memset(&g_endpoint,0,sizeof(g_endpoint));
+        g_device_roster_changed=1;memset(g_person_capable,0,sizeof(g_person_capable));
+    }
+    memcpy(g_device_link.transport,transport,sizeof(transport));
+    memcpy(g_device_link.ratchet,ratchet,sizeof(ratchet));
+    g_device_link.home = home_dir();
+    g_device_link.send = device_link_send;
+    g_device_link.emit = device_link_emit;
+    g_endpoint.home=home_dir();memcpy(g_endpoint.transport,transport,65);memcpy(g_endpoint.ratchet,ratchet,65);
+    g_endpoint.exists=endpoint_exists;g_endpoint.pin=endpoint_pin;g_endpoint.connect=endpoint_connect;
+    g_endpoint.promote=endpoint_promote;g_endpoint.remove=endpoint_remove;g_endpoint.send=endpoint_send;
+    g_device_sync.home=home_dir();g_device_sync.ratchet=g_ratchet;
+    memcpy(g_device_sync.transport,transport,sizeof(transport));
+    memcpy(g_device_sync.ratchet_key,ratchet,sizeof(ratchet));
+    g_device_sync.send=device_cipher_send;g_device_sync.pin=device_peer_pin;g_device_sync.emit=emit;
+    g_device_sync.apply=device_sync_apply;
+    g_device_sync.available=device_peer_available;
+    harbor_person_chat_bind(&g_person_chat,&g_device_sync);
+    g_device_sync.application=&g_person_chat;
+    g_device_sync.index_event=harbor_person_chat_index;
+    g_device_sync.peer_authorized=harbor_person_chat_peer;
+    g_device_sync.accept_event=harbor_person_chat_accept;
+    g_device_sync.targets=harbor_person_chat_targets;
+    g_device_sync.acknowledged=harbor_person_chat_ack;
+    return 0;
+}
+/* Pins authenticate transport keys. Current rosters determine continuing
+ * application authority; only genuinely unmanaged peers retain legacy access. */
+static int friend_application_allowed(uint32_t friend)
+{
+    char key[65], pin[65], root[65];
+    if (device_link_prepare() || omaq_tox_friend_pk_hex(g_tox, friend, key) ||
+        device_peer_pin(key, pin)) return 0;
+    struct harbor_devices *d = calloc(1, sizeof(*d));
+    if (!d) return 0;
+    const char *error = harbor_devices_operation(home_dir(), "device.status",
+        g_device_sync.transport, g_device_sync.ratchet_key, "", "", "", "", 0, d);
+    int allowed = 0, managed = 0, local = 0;
+    if (error && strcmp(error, "device_not_linked")) goto done;
+    if (!error) {
+        for (size_t i = 0; i < d->count; i++) {
+            char transport[65], ratchet[65];
+            if (!memcmp(d->devices[i].signing, d->local, 32))
+                local = d->devices[i].active;
+            harbor_device_hex(d->devices[i].transport, 32, transport, 65);
+            harbor_device_hex(d->devices[i].ratchet, 32, ratchet, 65);
+            if (!strcmp(transport, key)) {
+                managed = 1;
+                allowed = d->devices[i].active && !strcmp(ratchet, pin);
+            }
+        }
+        if (!local) { allowed = 0; goto done; }
+        if (managed) goto done;
+    }
+    int found = harbor_people_find(home_dir(), key, pin, root, d);
+    allowed = found == 1 || found == -3;
+done:
+    free(d);
+    return allowed;
+}
+
 #endif
 
 static int bound_storage_conversation(const char *conversation, char *out,
@@ -1415,7 +1593,10 @@ static void fail_direct_state_backend(void)
 	g_direct_state_migration_failed = 1;
 #ifdef HAVE_SIGNAL
 	if (g_ratchet) {
-		omaq_ratchet_close(g_ratchet);
+		#ifdef HAVE_TOX
+        harbor_sync_close(&g_device_sync);
+#endif
+        omaq_ratchet_close(g_ratchet);
 		g_ratchet = NULL;
 	}
 #endif
@@ -1440,23 +1621,23 @@ static int ensure_private_directory(const char *path, const char *label)
 	struct stat status;
 
 	if (!path || !label || path[0] != '/') {
-		fprintf(stderr, "omaq: %s must be an absolute path\n", label ? label : "directory");
+		fprintf(stderr, "harbor: %s must be an absolute path\n", label ? label : "directory");
 		return -1;
 	}
 	if (mkdir(path, 0700) != 0 && errno != EEXIST) {
-		fprintf(stderr, "omaq: could not create %s at %s: %s\n",
+		fprintf(stderr, "harbor: could not create %s at %s: %s\n",
 			label, path, strerror(errno));
 		return -1;
 	}
 	if (lstat(path, &status) != 0 || !S_ISDIR(status.st_mode) ||
 	    status.st_uid != geteuid()) {
-		fprintf(stderr, "omaq: %s must be a real directory owned by uid %lu: %s\n",
+		fprintf(stderr, "harbor: %s must be a real directory owned by uid %lu: %s\n",
 			label, (unsigned long)geteuid(), path);
 		return -1;
 	}
 	if ((status.st_mode & 0077) != 0) {
 		fprintf(stderr,
-			"omaq: %s permissions are %03o; run: chmod 700 -- '%s'\n",
+			"harbor: %s permissions are %03o; run: chmod 700 -- '%s'\n",
 			label, (unsigned)(status.st_mode & 0777), path);
 		return -1;
 	}
@@ -1472,7 +1653,7 @@ static int ensure_state_dir(void)
 	int fd;
 
 	if (!state || strlen(state) >= sizeof(parent) ||
-	    ensure_private_directory(state, "OMAQ_STATE") != 0)
+	    ensure_private_directory(state, "HARBOR_STATE") != 0)
 		return -1;
 	memcpy(parent, state, strlen(state) + 1);
 	len = strlen(parent);
@@ -1532,7 +1713,7 @@ static int uninstall_marker_present(void)
 		return errno == ENOENT ? 0 : -1;
 	if (!S_ISREG(status.st_mode) || status.st_uid != geteuid() ||
 	    status.st_nlink != 1 || (status.st_mode & 0077) != 0) {
-		fprintf(stderr, "omaq: unsafe uninstall marker: %s\n", path);
+		fprintf(stderr, "harbor: unsafe uninstall marker: %s\n", path);
 		return -1;
 	}
 	return 1;
@@ -1855,7 +2036,7 @@ static void queue_stdout(const char *s)
 	}
 	/* Critical events remain durable even after the current stdout pipe closes. */
 	if (!g_stdout_spool || omaq_stdout_spool_append(g_stdout_spool, s) != 0) {
-		fprintf(stderr, "omaq: critical stdout spool append failed: %s\n",
+		fprintf(stderr, "harbor: critical stdout spool append failed: %s\n",
 			strerror(errno));
 		g_fatal_io = 1;
 	}
@@ -1879,7 +2060,7 @@ static void flush_stdout(void)
 		if (rc == OMAQ_STDOUT_FLUSH_OUTPUT_ERROR)
 			g_stdout_closed = 1;
 		else if (rc == OMAQ_STDOUT_FLUSH_SPOOL_ERROR) {
-			fprintf(stderr, "omaq: critical stdout spool read failed: %s\n",
+			fprintf(stderr, "harbor: critical stdout spool read failed: %s\n",
 				strerror(errno));
 			g_fatal_io = 1;
 		}
@@ -2007,7 +2188,18 @@ static void emit_invite_state(const char *url, int64_t expires,
 	char escaped_url[OMAQ_URL_MAX * 6 + 1], escaped_op[64], escaped_request[160];
 	char op_field[96] = "", request_field[192] = "";
 	char event[OMAQ_URL_MAX * 6 + 512];
+    const char *bearer = "false";
+#ifdef HAVE_TOX
+    bearer = g_issued_bearer ? "true" : "false";
+#endif
 
+    char branded_url[OMAQ_URL_MAX + 2];
+    if (url && strncmp(url, "omaq://", 7) == 0) {
+        if (snprintf(branded_url, sizeof(branded_url), "harbor://%s", url + 7) >=
+            (int)sizeof(branded_url))
+            return;
+        url = branded_url;
+    }
 	if (omaq_json_escape(url ? url : "", escaped_url,
 			     sizeof(escaped_url)) != 0)
 		return;
@@ -2018,8 +2210,9 @@ static void emit_invite_state(const char *url, int64_t expires,
 		snprintf(request_field, sizeof(request_field),
 			 ",\"request\":\"%s\"", escaped_request);
 	snprintf(event, sizeof(event),
-		 "{\"event\":\"invite\",\"url\":\"%s\",\"expires\":%lld%s%s}",
+		 "{\"event\":\"invite\",\"url\":\"%s\",\"expires\":%lld,\"bearer\":%s%s%s}",
 		 escaped_url, (long long)(expires > 0 ? expires : 0),
+         bearer,
 		 op_field, request_field);
 	emit(event);
 }
@@ -2134,7 +2327,7 @@ static void emit_locked_status(void)
 	char ev[320];
 
 	snprintf(ev, sizeof(ev),
-		 "{\"event\":\"snapshot\",\"protocol\":%d,\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"locked\":true,\"instance\":\"%s\",\"call\":null}",
+		 "{\"event\":\"snapshot\",\"protocol\":%d," HARBOR_UI_CAPABILITIES "\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"locked\":true,\"instance\":\"%s\",\"call\":null}",
 		 OMAQ_PROTOCOL_VERSION, OMAQ_HISTORY_CLEAR_VERSION, OMAQ_IDENTITY_EXPORT_VERSION,
 		 omaq_unread_total(&g_unread), g_instance_id);
 	emit(ev);
@@ -3713,6 +3906,8 @@ static int send_message_action(uint32_t friend, const char *conversation,
 
 static void clear_invite(void)
 {
+	g_issued_bearer = 0;
+	g_bearer_accept_pending = 0;
 	omaq_invite_issue_clear(&g_pending_invite, &g_invite_conflicts,
 				g_issued_id, g_issued_url, &g_issued_exp,
 				&g_issued_is_group, g_issued_group);
@@ -3767,7 +3962,7 @@ static void emit_recorded_direct_conflicts(void)
 
 static void announce_pending_direct(void)
 {
-	if (!g_pending_invite.used || g_pending_announced)
+	if (!g_pending_invite.used || g_pending_announced || g_issued_bearer)
 		return;
 	if (emit_pending_direct_request() == 0) {
 		g_pending_announced = 1;
@@ -5341,6 +5536,9 @@ static void emit_friends(void)
 		const char *online, *status;
 		int friend_status;
 
+#ifdef HAVE_SIGNAL
+        if(!friend_has_pin(list[i]))continue;
+#endif
 		if (omaq_tox_friend_name(g_tox, list[i], name, sizeof(name)) != 0 ||
 		    !omaq_group_member_name_bytes_ok(name, strlen(name)))
 			snprintf(name, sizeof(name), "Friend %u", list[i]);
@@ -5457,8 +5655,12 @@ static void avatar_broadcast(const char *path)
 	if (avatar_hash_file(path, hid) != 0)
 		return;
 	n = omaq_tox_friend_list(g_tox, list, 64);
-	for (i = 0; i < n; i++)
+	for (i = 0; i < n; i++) {
+#ifdef HAVE_SIGNAL
+        if(!friend_application_allowed(list[i]))continue;
+#endif
 		(void)omaq_file_send_avatar_begin(g_tox, list[i], path, hid, NULL);
+    }
 }
 
 static void hook_presence(void *ud, uint32_t friend, int online)
@@ -5467,6 +5669,9 @@ static void hook_presence(void *ud, uint32_t friend, int online)
 	uint8_t hid[32];
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend))return;
+#endif
 	emit_friends();
 	if (!online || !g_tox)
 		return;
@@ -5505,6 +5710,9 @@ static void hook_typing(void *ud, uint32_t friend, int typing)
 	char key[65], event[240];
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend))return;
+#endif
 	if (omaq_tox_friend_pk_hex(g_tox, friend, key) != 0)
 		return;
 	snprintf(event, sizeof(event),
@@ -5568,6 +5776,8 @@ static void hook_req(void *ud, const uint8_t *pk32, const char *msg)
 	if (g_issued_is_group) {
 		g_pending_announced = 1;
 		emit("{\"event\":\"request\",\"kind\":\"group\"}");
+	} else if (g_issued_bearer) {
+		g_bearer_accept_pending = 1;
 	} else if (!g_have_gauth && !g_have_gpending) {
 		announce_pending_direct();
 	}
@@ -5579,6 +5789,9 @@ static void hook_ginv(void *ud, uint32_t friend, const uint8_t *data, size_t len
 	int64_t now = (int64_t)time(NULL);
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend))return;
+#endif
 	if (!data || len == 0 || len > sizeof(g_gpending_data) || !g_have_gauth ||
 	    !omaq_group_invite_match(g_gauth_friend, friend, g_gauth_exp, now))
 		return;
@@ -6064,6 +6277,23 @@ static void hook_msg(void *ud, uint32_t friend, const char *text)
 	size_t plain_length = 0;
 #endif
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(text && !strncmp(text,"HPI2|",5)) {
+        char key[65];unsigned char bytes[32];
+        if(strlen(text)<=140 && !g_issued_is_group && !omaq_tox_friend_pk_hex(g_tox,friend,key) &&
+           endpoint_owned(key)){
+            int valid=1;for(size_t i=0;i<32;i++){unsigned n;if(sscanf(key+i*2,"%2x",&n)!=1){valid=0;break;}bytes[i]=(unsigned char)n;}
+            if(valid)hook_req(NULL,bytes,text+5);
+        }
+        return;
+    }
+    if(text && !strncmp(text,"HPE2|",5)) {
+        char key[65];
+        if(!device_link_prepare() && !omaq_tox_friend_pk_hex(g_tox,friend,key))harbor_endpoint_receive(&g_endpoint,key,text);
+        return;
+    }
+    if(!friend_has_pin(friend))return;
+#endif
 	snprintf(conv, sizeof(conv), "%u", friend);
 	if (direct_state_for_friend(friend, state_conv, sizeof(state_conv)) != 0)
 		return;
@@ -6079,9 +6309,23 @@ static void hook_msg(void *ud, uint32_t friend, const char *text)
 		if (!g_ratchet || omaq_ratchet_pin_get(home_dir(), state_conv, expected,
 						 sizeof(expected)) != 1)
 			return;
+        if(!device_link_prepare()) {
+            char key[65];
+            if(!omaq_tox_friend_pk_hex(g_tox,friend,key) && harbor_sync_session_begin(&g_device_sync,key,expected)<0)return;
+        }
 		accepted = omaq_ratchet_accept_bundle(g_ratchet, state_conv, bundle, expected);
+#ifdef HARBOR_SYNC_FAULTS
+        if(accepted==0 && getenv("HARBOR_SYNC_CRASH_AT") && !strcmp(getenv("HARBOR_SYNC_CRASH_AT"),"after-session")) {
+            char key[65];
+            if(!omaq_tox_friend_pk_hex(g_tox,friend,key) && harbor_sync_outbox_pending(&g_device_sync,key))_exit(78);
+        }
+#endif
 		if (accepted < 0)
 			return;
+        if(accepted==0 && !device_link_prepare()) {
+            char key[65];
+            if(!omaq_tox_friend_pk_hex(g_tox,friend,key))harbor_sync_session_changed(&g_device_sync,key,expected);
+        }
 		g_send_queue_wake = 1;
 		if (modern_request) {
 			/* Requests are idempotent: replay the exact durable response even
@@ -6096,6 +6340,17 @@ static void hook_msg(void *ud, uint32_t friend, const char *text)
 		}
 		return;
 	}
+    if (text && !strncmp(text,"HSX1|",5)) {
+        char key[65],pin[65];
+        if(!device_link_prepare() && !omaq_tox_friend_pk_hex(g_tox,friend,key) &&
+            omaq_ratchet_pin_get(home_dir(),state_conv,pin,sizeof(pin))==1) {
+            int rc=harbor_sync_receive(&g_device_sync,key,pin,text);
+            if(rc==OMAQ_RATCHET_DECRYPT_RECOVER && ratchet_recovery_allowed(state_conv) &&
+                !omaq_ratchet_reset_session(g_ratchet,state_conv))
+                (void)request_ratchet_session(friend);
+        }
+        return;
+    }
 	if (!text || strncmp(text, "OQR1", 4) != 0 || !g_ratchet)
 		return;
 	{
@@ -6113,6 +6368,35 @@ static void hook_msg(void *ud, uint32_t friend, const char *text)
 	if (!omaq_message_text_bytes_ok((const uint8_t *)plain, plain_length))
 		return;
 	text = plain;
+#endif
+#ifdef HAVE_SIGNAL
+    if(text && !strcmp(text,"OQX1|harbor-person-v1")){
+        char key[65];
+        if(!device_link_prepare() && !omaq_tox_friend_pk_hex(g_tox,friend,key))
+            if(person_note_capability(key))(void)device_link_send(key,"OQX1|harbor-person-v1");
+        return;
+    }
+    if(text && !strncmp(text,"HP1|",4)){
+        if(friend_application_allowed(friend)) people_receive(friend,text);
+        return;
+    }
+    if(text && !strncmp(text,"HSA1|",5)) {
+        char key[65],pin[65];
+        if(!device_link_prepare() && !omaq_tox_friend_pk_hex(g_tox,friend,key) &&
+            omaq_ratchet_pin_get(home_dir(),state_conv,pin,sizeof(pin))==1)
+            harbor_sync_ack(&g_device_sync,key,pin,text+5);
+        return;
+    }
+    if (text && !strncmp(text, "HD1|", 4)) {
+        char key[65], pinned[65];
+        if (!device_link_prepare() &&
+            omaq_tox_friend_pk_hex(g_tox, friend, key) == 0 &&
+            omaq_ratchet_pin_get(home_dir(), state_conv, pinned, sizeof(pinned)) == 1)
+            harbor_link_receive(&g_device_link, key, pinned, text);
+        g_device_roster_changed=1;
+        return;
+    }
+    if (!friend_application_allowed(friend)) return;
 #endif
 	if (text && strncmp(text, "OQX1|gmbd|", 10) == 0) {
 #ifdef HAVE_SIGNAL
@@ -8379,6 +8663,9 @@ static void hook_file_recv(void *ud, uint32_t friend, uint32_t fnum,
 			   const char *name, uint64_t size)
 {
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend)){cancel_file_after_error(friend,fnum);return;}
+#endif
 	if (omaq_file_offer_store(friend, fnum, name, size) != 0) {
 		cancel_file_after_error(friend, fnum);
 		return;
@@ -8393,6 +8680,15 @@ static void hook_file_creq(void *ud, uint32_t friend, uint32_t fnum, uint64_t po
 	const char *request;
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend)) {
+        cancel_file_after_error(friend,fnum);
+        (void)file_request_finish_pending(friend,fnum,0);
+        request=file_request_finish(friend,fnum,"failed");
+        if(!avatar)emit_file("failed",friend,fnum,NULL,0,NULL,"out",request);
+        return;
+    }
+#endif
 	if (omaq_file_chunk_out(g_tox, friend, fnum, pos, len) != 0) {
 		event = omaq_file_event_for(avatar, OMAQ_FILE_OUTCOME_ERROR);
 		cancel_file_after_error(friend, fnum);
@@ -8444,6 +8740,14 @@ static void hook_file_chunk(void *ud, uint32_t friend, uint32_t fnum, uint64_t p
 	omaq_file_event event;
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend)) {
+        int is_avatar=omaq_file_is_avatar(friend,fnum);
+        cancel_file_after_error(friend,fnum);
+        if(!is_avatar)emit_file("failed",friend,fnum,NULL,0,NULL,"in",NULL);
+        return;
+    }
+#endif
 	avatar = omaq_file_is_avatar(friend, fnum);
 	rc = omaq_file_chunk_in(friend, fnum, pos, data, len, dest, sizeof(dest));
 	if (rc < 0) {
@@ -8498,6 +8802,9 @@ static void hook_avatar(void *ud, uint32_t friend, uint32_t fnum, uint64_t size)
 	char dest[512], id[16], state_id[OMAQ_DIRECT_STATE_ID_MAX], dir[512], got[512];
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend)){(void)omaq_tox_file_control(g_tox,friend,fnum,OMAQ_TOX_FILE_CANCEL);return;}
+#endif
 	snprintf(id, sizeof(id), "%u", friend);
 	if (direct_state_for_friend(friend, state_id, sizeof(state_id)) != 0) {
 		(void)omaq_tox_file_control(g_tox, friend, fnum, OMAQ_TOX_FILE_CANCEL);
@@ -9005,6 +9312,9 @@ static void hook_call(void *ud, uint32_t friend, int state)
 	char key[65], event[400];
 
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend)){(void)omaq_tox_av_hangup(g_tox,friend);return;}
+#endif
 	if (g_call_end.used || g_av_reset_requested) {
 		(void)omaq_tox_av_hangup(g_tox, friend);
 		return;
@@ -9081,6 +9391,9 @@ static void hook_audio(void *ud, uint32_t friend, const int16_t *pcm,
 		       size_t samples, uint8_t channels, uint32_t rate)
 {
 	(void)ud;
+#ifdef HAVE_SIGNAL
+    if(!friend_application_allowed(friend))return;
+#endif
 	omaq_av_receive(friend, pcm, samples, channels, rate);
 }
 
@@ -9154,6 +9467,17 @@ static void pump_call_audio(void)
 
 	if (!g_tox || g_call_end.used)
 		return;
+#ifdef HAVE_SIGNAL
+    const char *call_state;
+    if(omaq_av_status(&friend,&call_state) && !friend_application_allowed(friend)) {
+#if OMAQ_PROTOCOL_VERSION >= 15
+        (void)begin_call_end(friend,NULL,"authorization_unavailable");
+#else
+        (void)omaq_av_stop(g_tox,friend);
+#endif
+        return;
+    }
+#endif
 	(void)omaq_av_pump(g_tox);
 	if (!omaq_av_take_audio_error(&friend) || friend == UINT32_MAX ||
 	    !omaq_av_is_current(friend))
@@ -10425,7 +10749,10 @@ static int restore_guarded_identity(const char *stage_save, const char *pass,
 rollback:
 #ifdef HAVE_SIGNAL
 	if (g_ratchet) {
-		omaq_ratchet_close(g_ratchet);
+		#ifdef HAVE_TOX
+        harbor_sync_close(&g_device_sync);
+#endif
+        omaq_ratchet_close(g_ratchet);
 		g_ratchet = NULL;
 	}
 #endif
@@ -10754,6 +11081,418 @@ static void service_send_queue(void)
 }
 #endif
 
+#if defined(HAVE_TOX) && defined(HAVE_SIGNAL)
+static int endpoint_pin(const char *key,char pin[65]) {
+    char stored[67];if(snprintf(stored,sizeof(stored),"d:%s",key)!=66)return -1;
+    return omaq_ratchet_pin_get(home_dir(),stored,pin,65);
+}
+static int endpoint_key(const char *key,unsigned char bytes[32]) {
+    if(strlen(key)!=64)return -1;
+    for(size_t i=0;i<32;i++){unsigned n;if(sscanf(key+i*2,"%2x",&n)!=1)return -1;bytes[i]=(unsigned char)n;}
+    return 0;
+}
+static int endpoint_exists(const char *key) {
+    unsigned char bytes[32];return endpoint_key(key,bytes)?-1:omaq_tox_friend_by_pk(g_tox,bytes)!=UINT32_MAX;
+}
+static int endpoint_connect(const char *key) {
+    unsigned char bytes[32];if(endpoint_key(key,bytes))return -1;
+    if(omaq_tox_friend_by_pk(g_tox,bytes)!=UINT32_MAX)return 0;
+    char ids[HARBOR_PROBE_MAX][65];int count=harbor_probe_list(home_dir(),ids),owned=0,active=0;
+    if(count<0)return -1;
+    for(int i=0;i<count;i++){
+        struct harbor_probe_record probe;if(harbor_probe_get(home_dir(),ids[i],&probe))return -1;
+        if(!strncmp(probe.proposal+64,key,64)){if(probe.owned)owned=1;if(!probe.closed)active=1;}
+    }
+    if(!owned || !active || !direct_friend_capacity_available())return -1;
+    int rc=omaq_tox_friend_accept(g_tox,bytes);
+    if(rc || migrate_direct_state()){if(rc==OMAQ_TOX_ADD_STATE_FAILED)fail_direct_state_backend();return -1;}
+    return 0;
+}
+static int endpoint_promote(const char *key,const char *pin) {
+    unsigned char bytes[32];if(endpoint_key(key,bytes))return -1;
+    uint32_t friend=omaq_tox_friend_by_pk(g_tox,bytes);
+    if(friend==UINT32_MAX || set_friend_ratchet_pin(friend,pin))return -1;
+    char directory[640];
+    if(snprintf(directory,sizeof(directory),"%s/ratchet/rk",home_dir())>=(int)sizeof(directory) || fsync_directory(directory))return -1;
+    g_device_roster_retry=0;emit_friends();return 0;
+}
+static int endpoint_owned(const char *key) {
+    char pin[65];if(endpoint_pin(key,pin)!=0)return 0;
+    char ids[HARBOR_PROBE_MAX][65];int count=harbor_probe_list(home_dir(),ids);
+    if(count<0)return 0;
+    for(int i=0;i<count;i++){
+        struct harbor_probe_record r;
+        if(!harbor_probe_get(home_dir(),ids[i],&r) && r.owned && !strncmp(r.proposal+64,key,64))return 1;
+    }
+    return 0;
+}
+static int endpoint_remove(const char *key) {
+    char pin[65];int pinned=endpoint_pin(key,pin);if(pinned<0)return -1;if(pinned==1)return 0;
+    struct harbor_devices *own=calloc(1,sizeof(*own));if(!own)return -1;
+    unsigned char bytes[32];
+    if(endpoint_key(key,bytes) || harbor_devices_operation(home_dir(),"device.status",g_endpoint.transport,g_endpoint.ratchet,"","","","",0,own)){
+        free(own);return -1;
+    }
+    int reserved=0;for(size_t i=0;i<own->count;i++)if(!memcmp(own->devices[i].transport,bytes,32))reserved=1;
+    free(own);if(reserved)return 0;
+    uint32_t friend=omaq_tox_friend_by_pk(g_tox,bytes);
+    if(omaq_direct_state_remove_begin(home_dir(),key))return -1;
+    if(friend!=UINT32_MAX && omaq_tox_friend_delete(g_tox,friend)){fail_direct_state_backend();return -1;}
+    if(migrate_direct_state_with_removal(key)){fail_direct_state_backend();return -1;}
+    return 0;
+}
+static int endpoint_send(const char *key,const char *metadata) {
+    unsigned char bytes[32];if(endpoint_key(key,bytes))return -1;
+    uint32_t friend=omaq_tox_friend_by_pk(g_tox,bytes);
+    return friend==UINT32_MAX || !omaq_tox_friend_online(g_tox,friend)?-1:omaq_tox_send(g_tox,friend,metadata);
+}
+static void rendezvous_tick(void) {
+    static int64_t retry;
+    int64_t now=monotonic_millis();if(now<retry)return;retry=now+5000;
+    char keys[HARBOR_PROBE_MAX][65],rk[65];
+    if(!g_ratchet || omaq_ratchet_local_rk(g_ratchet,rk))return;
+    int count=harbor_rendezvous_list(home_dir(),keys);
+    for(int i=0;i<count;i++){
+        struct harbor_rendezvous r;if(harbor_rendezvous_get(home_dir(),keys[i],&r))continue;
+        if((uint64_t)time(NULL)>=r.expires){(void)harbor_rendezvous_drop(home_dir(),keys[i]);continue;}
+        unsigned char bytes[32];if(endpoint_key(keys[i],bytes))continue;
+        uint32_t friend=omaq_tox_friend_by_pk(g_tox,bytes);
+        if(friend==UINT32_MAX || !friend_has_pin(friend))continue;
+        if(ratchet_has_session_friend(friend)){(void)harbor_rendezvous_drop(home_dir(),keys[i]);continue;}
+        char wire[160];snprintf(wire,sizeof(wire),"HPI2|%s|rk=%s",r.invite,rk);
+        (void)endpoint_send(keys[i],wire);
+        if(omaq_tox_friend_online(g_tox,friend))(void)request_ratchet_session(friend);
+    }
+}
+static void device_reconcile(void)
+{
+    g_device_roster_changed=0;
+    int64_t now=monotonic_millis();
+    struct harbor_devices *d=calloc(1,sizeof(*d));
+    if(!d)return;
+    const char *problem=harbor_devices_operation(home_dir(),"device.status",g_device_link.transport,
+        g_device_link.ratchet,"","","","",0,d);
+    if(problem){g_device_roster_retry=now+10000;free(d);return;}
+    unsigned char head[32];unsigned head_n;
+    if(EVP_Digest(d->chain,d->records*HARBOR_DEVICE_RECORD_SIZE,head,&head_n,EVP_sha256(),NULL)!=1 || head_n!=32){free(d);return;}
+    int changed=memcmp(head,g_device_roster_head,32)!=0;
+    if(!changed && now<g_device_roster_retry){free(d);return;}
+    memcpy(g_device_roster_head,head,32);g_device_roster_retry=now+10000;
+    int active=0;
+    for(size_t i=0;i<d->count;i++)if(!memcmp(d->devices[i].signing,d->local,32))active=d->devices[i].active;
+    char person[65],event[256];harbor_device_hex(d->root,32,person,sizeof(person));
+    snprintf(event,sizeof(event),"{\"event\":\"device.roster\",\"person\":\"%s\",\"active\":%s,\"sequence\":%zu}",person,active?"true":"false",d->records);
+    if(changed)emit(event);
+    if(!active){free(d);return;}
+    char headhex[65];harbor_device_hex(head,32,headhex,sizeof(headhex));
+    (void)harbor_sync_roster_head(&g_device_sync,"",headhex);
+    char *roster=malloc(HARBOR_DEVICE_ROSTER_HEX+1),*wire=malloc(HARBOR_DEVICE_ROSTER_HEX+128);
+    if(!roster||!wire){free(roster);free(wire);free(d);return;}
+    harbor_device_hex(d->chain,d->records*HARBOR_DEVICE_RECORD_SIZE,roster,HARBOR_DEVICE_ROSTER_HEX+1);
+    snprintf(wire,HARBOR_DEVICE_ROSTER_HEX+128,"HD1|update|%s|%s",person,roster);
+    for(size_t i=0;i<d->count;i++){
+        if(!memcmp(d->devices[i].signing,d->local,32))continue;
+        char key[65],pin[65];uint32_t friend;
+        harbor_device_hex(d->devices[i].transport,32,key,sizeof(key));
+        harbor_device_hex(d->devices[i].ratchet,32,pin,sizeof(pin));
+        friend=omaq_tox_friend_by_pk(g_tox,d->devices[i].transport);
+        if(d->devices[i].active && friend==UINT32_MAX){
+            if(!direct_friend_capacity_available() || omaq_direct_state_add_begin(home_dir(),key,pin))continue;
+            int rc=omaq_tox_friend_accept(g_tox,d->devices[i].transport);
+            if(rc){
+                if(rc==OMAQ_TOX_ADD_STATE_FAILED)fail_direct_state_backend();
+                else (void)omaq_direct_state_add_finish(home_dir());
+                continue;
+            }
+            friend=omaq_tox_friend_by_pk(g_tox,d->devices[i].transport);
+            if(friend==UINT32_MAX || set_friend_ratchet_pin(friend,pin) || migrate_direct_state()){
+                fail_direct_state_backend();continue;
+            }
+            emit_friends();
+        }
+        if(friend==UINT32_MAX || set_friend_ratchet_pin(friend,pin))continue;
+        if(!ratchet_has_session_friend(friend))(void)request_ratchet_session(friend);
+        else (void)device_link_send(key,wire);
+    }
+    people_reconcile(d);
+    free(roster);free(wire);free(d);
+}
+#endif
+
+#if defined(HAVE_TOX) && defined(HAVE_SIGNAL)
+static uint32_t people_ensure_device(const unsigned char transport[32],const unsigned char ratchet[32])
+{
+    char key[65],pin[65];harbor_device_hex(transport,32,key,sizeof(key));harbor_device_hex(ratchet,32,pin,sizeof(pin));
+    uint32_t friend=omaq_tox_friend_by_pk(g_tox,transport);
+    if(friend==UINT32_MAX){
+        if(!direct_friend_capacity_available() || omaq_direct_state_add_begin(home_dir(),key,pin))return UINT32_MAX;
+        int rc=omaq_tox_friend_accept(g_tox,transport);
+        if(rc){if(rc==OMAQ_TOX_ADD_STATE_FAILED)fail_direct_state_backend();else (void)omaq_direct_state_add_finish(home_dir());return UINT32_MAX;}
+        friend=omaq_tox_friend_by_pk(g_tox,transport);
+        if(friend==UINT32_MAX || set_friend_ratchet_pin(friend,pin) || migrate_direct_state()){
+            fail_direct_state_backend();return UINT32_MAX;
+        }
+        emit_friends();
+    }
+    if(set_friend_ratchet_pin(friend,pin))return UINT32_MAX;
+    if(!ratchet_has_session_friend(friend))(void)request_ratchet_session(friend);
+    return friend;
+}
+static void emit_people(const char *request)
+{
+    char escaped_request[481],event[2048],roots[HARBOR_PEOPLE_MAX][65];
+    if(!omaq_message_id_ok(request)||omaq_json_escape(request,escaped_request,sizeof(escaped_request)))return;
+    int count=harbor_people_list(home_dir(),roots,HARBOR_PEOPLE_MAX),valid=count>=0;
+    snprintf(event,sizeof(event),"{\"event\":\"person.list.begin\",\"request\":\"%s\",\"count\":%d}",escaped_request,count<0?0:count);emit(event);
+    struct harbor_devices *d=calloc(1,sizeof(*d));if(!d)valid=0;
+    for(int i=0;d&&i<count;i++){
+        char name[129],escaped_name[775];int devices=0,online=0;
+        if(harbor_people_get(home_dir(),roots[i],d,name)){valid=0;continue;}
+        for(size_t j=0;j<d->count;j++)if(d->devices[j].active){
+            devices++;uint32_t friend=omaq_tox_friend_by_pk(g_tox,d->devices[j].transport);
+            if(friend!=UINT32_MAX&&omaq_tox_friend_online(g_tox,friend))online=1;
+        }
+        if(omaq_json_escape(name,escaped_name,sizeof(escaped_name))){valid=0;continue;}
+        snprintf(event,sizeof(event),"{\"event\":\"person.info\",\"request\":\"%s\",\"id\":\"p:%.64s\",\"key\":\"%.64s\",\"name\":\"%s\",\"devices\":%d,\"online\":%s}",escaped_request,roots[i],roots[i],escaped_name,devices,online?"true":"false");emit(event);
+    }
+    free(d);
+    snprintf(event,sizeof(event),"{\"event\":\"person.list.end\",\"request\":\"%s\",\"ok\":%s}",escaped_request,valid?"true":"false");emit(event);
+}
+struct contact_projection {
+    struct harbor_devices *base;
+    char *body;
+    size_t records;
+    int failed;
+};
+static void contact_projection_latest(const struct harbor_sync_event *event,void *context)
+{
+    struct contact_projection *projection=context;
+    if(projection->failed || strncmp(event->text,"HPC1|",5))return;
+    struct harbor_devices *candidate=calloc(1,sizeof(*candidate));char name[129];
+    if(!candidate){projection->failed=1;return;}
+    if(harbor_people_card_decode(event->text,candidate,name)){free(candidate);return;}
+    /* A later stale prefix cannot supersede a longer accepted roster. A fork
+     * remains an error when its own event is projected; it is never substituted
+     * for the event's chain here. Canonical iteration resolves equal heads. */
+    if(candidate->records>=projection->records &&
+       candidate->records>=projection->base->records &&
+       !memcmp(candidate->chain,projection->base->chain,
+               projection->base->records*HARBOR_DEVICE_RECORD_SIZE)) {
+        char *copy=strdup(event->text);
+        if(!copy)projection->failed=1;
+        else {free(projection->body);projection->body=copy;projection->records=candidate->records;}
+    }
+    free(candidate);
+}
+/* Reconcile durable contact cards into deterministic sibling replication intent.
+ * A crash between card installation and publication must not require the foreign
+ * endpoint to come online again. Endpoint endorsement remains separate. */
+static const char *people_publish_card(const struct harbor_devices *own,
+                                const struct harbor_devices *contact,const char *name)
+{
+    char *roster=malloc(HARBOR_DEVICE_ROSTER_HEX+1),*body=malloc(HARBOR_TEXT_MAX+1);
+    if(!roster || !body){free(roster);free(body);return "sync_unavailable";}
+    const char *problem="sync_event_invalid";
+    char hexname[257],local[65],identity[65],root[65],id[33],conversation[67];
+    harbor_device_hex((const unsigned char *)name,strlen(name),hexname,sizeof(hexname));
+    harbor_device_hex(contact->chain,contact->records*HARBOR_DEVICE_RECORD_SIZE,roster,HARBOR_DEVICE_ROSTER_HEX+1);
+    harbor_device_hex(own->local,32,local,sizeof(local));harbor_device_hex(own->root,32,identity,sizeof(identity));
+    harbor_device_hex(contact->root,32,root,sizeof(root));
+    int size=snprintf(body,HARBOR_TEXT_MAX+1,"HPC1|%s|%s",hexname,roster);
+    unsigned char digest[32];unsigned length;EVP_MD_CTX *hash=EVP_MD_CTX_new();
+    int safe=size>0 && (size_t)size<=HARBOR_TEXT_MAX && hash &&
+      EVP_DigestInit_ex(hash,EVP_sha256(),NULL)==1 && EVP_DigestUpdate(hash,local,64)==1 &&
+      EVP_DigestUpdate(hash,identity,64)==1 && EVP_DigestUpdate(hash,body,(size_t)size)==1 &&
+      EVP_DigestFinal_ex(hash,digest,&length)==1 && length==32;
+    EVP_MD_CTX_free(hash);
+    if(safe){
+        harbor_device_hex(digest,16,id,sizeof(id));snprintf(conversation,sizeof(conversation),"p:%s",root);
+        int created;problem=harbor_sync_publish(&g_device_sync,id,conversation,"contact",body,&created);
+    }
+    free(roster);free(body);return problem;
+}
+static void people_reconcile(const struct harbor_devices *own)
+{
+    char roots[HARBOR_PEOPLE_MAX][65],name[129],hexname[257];
+    int count=harbor_people_list(home_dir(),roots,HARBOR_PEOPLE_MAX);
+    struct harbor_devices *contact=calloc(1,sizeof(*contact));
+    for(int i=0;contact&&i<count;i++)if(!harbor_people_get(home_dir(),roots[i],contact,name)) {
+        /* Cached roster/name files may be a partial journal projection. Never
+         * mint fresh authority from them when accepted metadata already covers
+         * this head; pending replay will repair those files in canonical order. */
+        struct contact_projection projection={.base=contact,.records=contact->records};
+        int scanned=harbor_sync_visit_contacts(&g_device_sync,contact_projection_latest,&projection);
+        if(scanned>=0 && !projection.failed && !projection.body)people_publish_card(own,contact,name);
+        free(projection.body);
+        unsigned char head[32];unsigned length;char scope[67],hex[65];
+        if(EVP_Digest(contact->chain,contact->records*HARBOR_DEVICE_RECORD_SIZE,head,&length,EVP_sha256(),NULL)==1 && length==32) {
+            harbor_device_hex(head,32,hex,sizeof(hex));snprintf(scope,sizeof(scope),"p:%.64s",roots[i]);
+            (void)harbor_sync_roster_head(&g_device_sync,scope,hex);
+        }
+        for(size_t j=0;j<contact->count;j++)if(contact->devices[j].active){
+            char key[65],pin[65],root[65];struct harbor_devices *endorsed=calloc(1,sizeof(*endorsed));
+            harbor_device_hex(contact->devices[j].transport,32,key,sizeof(key));harbor_device_hex(contact->devices[j].ratchet,32,pin,sizeof(pin));
+            if(endorsed && harbor_people_find(home_dir(),key,pin,root,endorsed)==1 && !strcmp(root,roots[i]))
+                (void)people_ensure_device(contact->devices[j].transport,contact->devices[j].ratchet);
+            else (void)harbor_endpoint_candidate(&g_endpoint,roots[i],&contact->devices[j]);
+            free(endorsed);
+        }
+    }
+    free(contact);
+    if(omaq_tox_self_name(g_tox,name,sizeof(name)) || !name[0])snprintf(name,sizeof(name),"Harbor contact");
+    harbor_device_hex((const unsigned char *)name,strlen(name),hexname,sizeof(hexname));
+    char *roster=malloc(HARBOR_DEVICE_ROSTER_HEX+1),*wire=malloc(HARBOR_DEVICE_ROSTER_HEX+300);
+    if(!roster||!wire){free(roster);free(wire);return;}
+    harbor_device_hex(own->chain,own->records*HARBOR_DEVICE_RECORD_SIZE,roster,HARBOR_DEVICE_ROSTER_HEX+1);
+    snprintf(wire,HARBOR_DEVICE_ROSTER_HEX+300,"HP1|%s|%s",hexname,roster);
+    uint32_t friends[OMAQ_DIRECT_STATE_FRIEND_MAX];int n=omaq_tox_friend_list(g_tox,friends,OMAQ_DIRECT_STATE_FRIEND_MAX);
+    for(int i=0;i<n;i++){
+        char key[65];
+        if(!friend_has_pin(friends[i]) || !omaq_tox_friend_online(g_tox,friends[i]) || omaq_tox_friend_pk_hex(g_tox,friends[i],key))continue;
+        if(!ratchet_has_session_friend(friends[i])){(void)request_ratchet_session(friends[i]);continue;}
+        int sibling=0;
+        for(size_t j=0;j<own->count;j++){harbor_device_hex(own->devices[j].transport,32,(char *)hexname,sizeof(hexname));if(!strcmp(hexname,key))sibling=1;}
+        (void)device_link_send(key,"OQX1|harbor-person-v1");
+        if(!sibling && person_capable(key))(void)device_link_send(key,wire);
+    }
+    free(roster);free(wire);emit_people("person-refresh");
+}
+static int people_decode_name(const char *hex,size_t length,char name[129])
+{
+    if(!length || length>256 || length%2)return -1;
+    for(size_t i=0;i<length/2;i++){
+        unsigned value=0;
+        for(size_t j=0;j<2;j++){
+            char c=hex[i*2+j];unsigned digit=c>='0'&&c<='9'?(unsigned)(c-'0'):c>='a'&&c<='f'?(unsigned)(c-'a'+10):16;
+            if(digit>15)return -1;
+            value=value*16+digit;
+        }
+        name[i]=(char)value;
+    }
+    if(!omaq_utf8_bytes_ok((const unsigned char *)name,length/2,1))return -1;
+    name[length/2]=0;return 0;
+}
+static int device_sync_apply(const struct harbor_sync_event *event,int fresh)
+{
+    if(strcmp(event->kind,"contact")){
+        if(fresh)harbor_person_chat_apply(&g_person_chat,event);
+        return 0;
+    }
+    struct harbor_devices *base=calloc(1,sizeof(*base));char checked_name[129];
+    if(!base || harbor_people_card_decode(event->text,base,checked_name)){free(base);return -1;}
+    struct contact_projection projection={.base=base,.records=base->records};
+    int scanned=harbor_sync_visit_contacts(&g_device_sync,contact_projection_latest,&projection);
+    free(base);
+    if(scanned<0 || projection.failed || !projection.body){free(projection.body);return -1;}
+    char *copy=strdup(projection.body+5);free(projection.body);if(!copy)return -1;
+    char *separator=strchr(copy,'|');if(!separator){free(copy);return -1;}
+    *separator++=0;
+    size_t n=strlen(copy);char name[129],root[65];
+    if(people_decode_name(copy,n,name)){free(copy);return -1;}
+    const char *error=harbor_people_install(home_dir(),NULL,NULL,separator,name,root);
+    /* A validated older prefix is already represented by the newer projection.
+     * It must not replace that projection or wedge journal replay. */
+    if(error && !strcmp(error,"person_roster_stale"))error=NULL;
+    if(!error){g_device_roster_retry=0;if(!g_device_sync.replaying)emit_people("person-sync");}
+    free(copy);return error?-1:0;
+}
+static void people_receive(uint32_t friend,const char *text)
+{
+    char peer[65],pin[65],stored[67],name[129],root[65];
+    if(device_link_prepare() || omaq_tox_friend_pk_hex(g_tox,friend,peer) || !person_capable(peer) ||
+        direct_state_for_friend(friend,stored,sizeof(stored)) || omaq_ratchet_pin_get(home_dir(),stored,pin,sizeof(pin))!=1)return;
+    struct harbor_devices *own=calloc(1,sizeof(*own)),*incoming=calloc(1,sizeof(*incoming));
+    if(!own||!incoming){free(own);free(incoming);return;}
+    if(harbor_devices_operation(home_dir(),"device.status",g_device_link.transport,g_device_link.ratchet,"","","","",0,own)){free(own);free(incoming);return;}
+    const char *separator=strchr(text+4,'|');size_t n=separator?(size_t)(separator-(text+4)):0;
+    if(people_decode_name(text+4,n,name)){free(own);free(incoming);return;}
+    if(harbor_devices_decode(separator+1,incoming) || !memcmp(incoming->root,own->root,32)){free(own);free(incoming);return;}
+    const char *error=harbor_people_check(home_dir(),peer,pin,separator+1,name,root);
+    /* Journal the authenticated complete update before projecting either cache
+     * file. A rename can never be accepted only in a partially installed card. */
+    if(!error)error=people_publish_card(own,incoming,name);
+    if(!error && !harbor_people_endorse(home_dir(),root,peer,pin)) {
+        g_device_roster_retry=0;emit_people("person-discovery");
+    }
+    free(own);free(incoming);
+}
+#endif
+
+#if defined(HAVE_TOX) && defined(HAVE_SIGNAL)
+static void handle_device_operation(const omaq_op *op)
+{
+    char transport[65], ratchet[65], proposal[193], person[65], local[65];
+    char request[481], event[1024];
+    struct harbor_devices *devices = calloc(1, sizeof(*devices));
+    const char *error = "device_unavailable";
+    if (omaq_json_escape(op->request, request, sizeof(request))) request[0] = 0;
+    if (devices && g_tox && g_ratchet &&
+        omaq_message_id_ok(op->request) &&
+        omaq_tox_self_pk_hex(g_tox, transport) == 0 &&
+        omaq_ratchet_local_rk(g_ratchet, ratchet) == 0) {
+        if (!strcmp(op->op,"device.consent")) {
+            char proof[129];
+            error=harbor_device_consent(home_dir(),transport,ratchet,op->key,op->has_accept&&op->accept,proof);
+            if(!error){snprintf(event,sizeof(event),"{\"event\":\"devices.consent\",\"request\":\"%s\",\"proof\":\"%s\"}",request,proof);emit(event);free(devices);return;}
+        } else error = harbor_devices_operation(home_dir(), op->op, transport, ratchet,
+            op->payload, op->nickname, op->key, op->text,
+            op->has_accept && op->accept, devices);
+    }
+    if (error) {
+        snprintf(event, sizeof(event),
+            "{\"event\":\"devices.error\",\"request\":\"%s\",\"code\":\"%s\"}", request, error);
+        emit(event);
+    } else {
+        harbor_device_hex(devices->root, 32, person, sizeof(person));
+        harbor_device_hex(devices->local, 32, local, sizeof(local));
+        snprintf(proposal, sizeof(proposal), "%s%s%s", local, transport, ratchet);
+        size_t active_count = 0; int active = 0;
+        for (size_t i = 0; i < devices->count; i++) {
+            active_count += devices->devices[i].active != 0;
+            if (!memcmp(devices->devices[i].signing, devices->local, 32))
+                active = devices->devices[i].active;
+        }
+        char *roster = malloc(HARBOR_DEVICE_ROSTER_HEX + 1);
+        char *result = malloc(HARBOR_DEVICE_ROSTER_HEX + 18432);
+        char items[16384] = "";
+        size_t used = 0;
+        for (size_t i = 0; i < devices->count; i++) {
+            char key[65], name[295];
+            harbor_device_hex(devices->devices[i].signing, 32, key, sizeof(key));
+            if (omaq_json_escape(devices->devices[i].name, name, sizeof(name))) {
+                free(result); result = NULL; break;
+            }
+            int written = snprintf(items + used, sizeof(items) - used,
+                "%s{\"key\":\"%s\",\"name\":\"%s\",\"active\":%s,\"current\":%s}",
+                i ? "," : "", key, name, devices->devices[i].active ? "true" : "false",
+                !memcmp(devices->devices[i].signing, devices->local, 32) ? "true" : "false");
+            if (written < 0 || (size_t)written >= sizeof(items) - used) {
+                free(result); result = NULL; break;
+            }
+            used += (size_t)written;
+        }
+        if (!roster || !result) {
+            snprintf(event, sizeof(event), "{\"event\":\"devices.error\",\"request\":\"%s\",\"code\":\"device_unavailable\"}", request);
+            emit(event);
+        } else {
+            harbor_device_hex(devices->chain, devices->records * HARBOR_DEVICE_RECORD_SIZE,
+                roster, HARBOR_DEVICE_ROSTER_HEX + 1);
+            snprintf(result, HARBOR_DEVICE_ROSTER_HEX + 18432,
+                "{\"event\":\"devices\",\"request\":\"%s\",\"person\":\"%s\",\"local\":\"%s\","
+                "\"proposal\":\"%s\",\"roster\":\"%s\",\"count\":%zu,\"active\":%s,\"sequence\":%zu,\"items\":[%s]}",
+                request, person, local, proposal, roster, active_count,
+                active ? "true" : "false", devices->records, items);
+            emit(result);
+        }
+        free(roster); free(result);
+        if(strcmp(op->op,"device.status") && strcmp(op->op,"device.propose"))g_device_roster_changed=1;
+    }
+    free(devices);
+    if (!strcmp(op->op, "device.status") && !device_link_prepare())
+        harbor_link_replay(&g_device_link);
+}
+#endif
+
 static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 {
 	if (shutdown_requested()) {
@@ -11041,7 +11780,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 #endif
 		if (g_locked && !g_tox) {
 			snprintf(ev, sizeof(ev),
-				 "{\"event\":\"snapshot\",\"protocol\":%d,\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"locked\":true,\"instance\":\"%s\",\"call\":null%s}",
+				 "{\"event\":\"snapshot\",\"protocol\":%d," HARBOR_UI_CAPABILITIES "\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"locked\":true,\"instance\":\"%s\",\"call\":null%s}",
 				 OMAQ_PROTOCOL_VERSION, OMAQ_HISTORY_CLEAR_VERSION, OMAQ_IDENTITY_EXPORT_VERSION,
 				 omaq_unread_total(&g_unread), g_instance_id, request_field);
 			emit(ev);
@@ -11063,7 +11802,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			    omaq_json_escape(nickname, escaped_nickname, sizeof(escaped_nickname)) != 0)
 				escaped_nickname[0] = '\0';
 			snprintf(ev, sizeof(ev),
-				 "{\"event\":\"snapshot\",\"protocol\":%d,\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"online\":%s,\"addr\":\"%s\",\"nickname\":\"%s\",\"protected\":%s,\"instance\":\"%s\"%s%s}",
+				 "{\"event\":\"snapshot\",\"protocol\":%d," HARBOR_UI_CAPABILITIES "\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"online\":%s,\"addr\":\"%s\",\"nickname\":\"%s\",\"protected\":%s,\"instance\":\"%s\"%s%s}",
 				 OMAQ_PROTOCOL_VERSION, OMAQ_HISTORY_CLEAR_VERSION, OMAQ_IDENTITY_EXPORT_VERSION,
 				 omaq_unread_total(&g_unread),
 				 omaq_tox_online(g_tox) ? "true" : "false", addr,
@@ -11083,7 +11822,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			}
 			reannounce_pending_group();
 #if OMAQ_PROTOCOL_VERSION >= 16
-			if (g_pending_invite.used && !g_issued_is_group &&
+			if (g_pending_invite.used && !g_issued_is_group && !g_issued_bearer &&
 			    !g_have_gauth && !g_have_gpending &&
 			    emit_pending_direct_request() == 0)
 				emit_recorded_direct_conflicts();
@@ -11111,7 +11850,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 		{
 			char ev[768];
 			snprintf(ev, sizeof(ev),
-				 "{\"event\":\"snapshot\",\"protocol\":%d,\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"conversations\":[],\"instance\":\"%s\",\"call\":null%s}",
+				 "{\"event\":\"snapshot\",\"protocol\":%d," HARBOR_UI_CAPABILITIES "\"historyClear\":%d,\"identityExport\":%d,\"unread\":%u,\"conversations\":[],\"instance\":\"%s\",\"call\":null%s}",
 				 OMAQ_PROTOCOL_VERSION, OMAQ_HISTORY_CLEAR_VERSION, OMAQ_IDENTITY_EXPORT_VERSION,
 				 omaq_unread_total(&g_unread), g_instance_id, request_field);
 			emit(ev);
@@ -11250,6 +11989,10 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			emit_error("locked");
 		return 0;
 	}
+    if(!strncmp(op->conversation,"p:",2)){
+        if(!device_link_prepare() && harbor_person_chat_operation(&g_person_chat,op))return 0;
+        emit_error("person_unavailable");return 0;
+    }
 	if (g_tox && operation_uses_direct_conversation(op->op) &&
 	    !(op->conversation[0] == 'g' &&
 	      operation_allows_group_conversation(op->op))) {
@@ -11317,6 +12060,32 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			emit_all_unread();
 		}
 		emit_identity_action("unlock", op->id, NULL, -1);
+		return 0;
+	}
+    if(!strcmp(op->op,"person.list")){
+        emit_people(op->request);return 0;
+    }
+    if (!strncmp(op->op,"sync.",5)) {
+        if(!device_link_prepare())harbor_sync_operation(&g_device_sync,op);
+        else emit_error("device_unavailable");
+        return 0;
+    }
+    if (strncmp(op->op, "device.link.", 12) == 0) {
+        char pinned[65], stored[OMAQ_DIRECT_STATE_ID_MAX];
+        const char *peer = NULL, *ratchet = NULL;
+        if (!device_link_prepare() && !strcmp(op->op, "device.link.request") &&
+            direct_operation_binding_matches(op) &&
+            direct_state_for_friend(direct_id_number(op->conversation), stored, sizeof(stored)) == 0 &&
+            omaq_ratchet_pin_get(home_dir(), stored, pinned, sizeof(pinned)) == 1) {
+            peer = op->key; ratchet = pinned;
+        }
+        if (g_device_link.home)
+            harbor_link_operation(&g_device_link, op, peer, ratchet);
+        else emit_error("device_unavailable");
+        return 0;
+    }
+	if (strncmp(op->op, "device.", 7) == 0) {
+		handle_device_operation(op);
 		return 0;
 	}
 	if (strcmp(op->op, "identity.protect") == 0) {
@@ -11398,6 +12167,10 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 #endif
 	}
 	if (strcmp(op->op, "invite.create") == 0) {
+        if (op->has_accept && strcmp(op->kind, "direct") != 0) {
+            emit_identity_error("unsupported", op->request);
+            return 0;
+        }
 #ifdef HAVE_TOX
 		if ((strcmp(op->kind, "direct") == 0 ||
 		     (strcmp(op->kind, "group") == 0 && !op->id[0])) &&
@@ -11549,7 +12322,9 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 		if (g_tox) {
 			omaq_invite inv;
 			char url[OMAQ_URL_MAX];
-			const int ttl = 86400;
+            /* Ordinary links retain the established one-day policy; device
+             * onboarding explicitly requests the short five-minute policy. */
+            const int ttl = op->has_ttl && op->ttl_sec == 300 ? 300 : 86400;
 			memset(&inv, 0, sizeof(inv));
 			omaq_tox_self_addr_hex(g_tox, inv.tox_addr);
 			if (rand_id(inv.id, sizeof(inv.id)) != 0) {
@@ -11575,6 +12350,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			snprintf(g_issued_id, sizeof(g_issued_id), "%s", inv.id);
 			snprintf(g_issued_url, sizeof(g_issued_url), "%s", url);
 			g_issued_exp = inv.expiry;
+			g_issued_bearer = op->has_accept && op->accept;
 			emit_invite_state(url, inv.expiry, "create", op->request);
 			return 0;
 		}
@@ -11592,6 +12368,31 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			emit_identity_error("invite_expired", op->id);
 			return 0;
 		}
+        if (!strcmp(op->kind, "device")) {
+            if (inv.kind != INVITE_DIRECT) {
+                emit_identity_error("device_invite_required", op->id);
+                return 0;
+            }
+#if defined(HAVE_TOX) && defined(HAVE_SIGNAL)
+            if (device_link_prepare()) {
+                emit_identity_error("device_unavailable", op->id);
+                return 0;
+            }
+            struct harbor_devices *target = calloc(1, sizeof(*target));
+            const char *problem = target ? harbor_devices_operation(home_dir(),
+                "device.propose", g_device_link.transport, g_device_link.ratchet,
+                "", "", "", "", 0, target) : "device_unavailable";
+            int established = target && target->records;
+            free(target);
+            if (problem || established) {
+                emit_identity_error(problem ? problem : "device_already_linked", op->id);
+                return 0;
+            }
+#else
+            emit_identity_error("unsupported", op->id);
+            return 0;
+#endif
+        }
 		if (inv.kind == INVITE_GROUP) {
 #ifdef HAVE_TOX
 			if (g_tox) {
@@ -11685,10 +12486,13 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 				emit_identity_error("invite_self", op->id);
 				return 0;
 			}
-			if (friend_for_addr(inv.tox_addr, &fn) == 0) {
-				emit_identity_error("contact_exists", op->id);
-				return 0;
-			}
+			int promote_probe=0;
+            if (friend_for_addr(inv.tox_addr, &fn) == 0) {
+#ifdef HAVE_SIGNAL
+                promote_probe=endpoint_owned(contact_key);
+#endif
+                if(!promote_probe){emit_identity_error("contact_exists",op->id);return 0;}
+            }
 #if OMAQ_PROTOCOL_VERSION >= 16
 			if (op->id[0]) {
 				if (omaq_direct_redeemed_event(redeemed_event,
@@ -11700,16 +12504,19 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 				have_redeemed_event = 1;
 			}
 #endif
+            if(harbor_rendezvous_put(home_dir(),contact_key,inv.id,(uint64_t)inv.expiry)){
+                emit_identity_error("invite_rendezvous_failed",op->id);return 0;
+            }
 			if (omaq_direct_state_add_begin(home_dir(), contact_key, inv.rk) != 0) {
 				emit_identity_error("direct_state_migration_failed", op->id);
 				return 0;
 			}
-			if (!direct_friend_capacity_available()) {
+			if (!promote_probe && !direct_friend_capacity_available()) {
 				(void)omaq_direct_state_add_finish(home_dir());
 				emit_identity_error("contact_limit", op->id);
 				return 0;
 			}
-			add_rc = omaq_tox_friend_add(g_tox, inv.tox_addr, request, &fn);
+			add_rc = promote_probe ? omaq_tox_friend_reinvite(g_tox,inv.tox_addr,request,&fn) : omaq_tox_friend_add(g_tox, inv.tox_addr, request, &fn);
 			if (add_rc != 0) {
 				if (add_rc == OMAQ_TOX_ADD_STATE_FAILED)
 					fail_direct_state_backend();
@@ -11777,8 +12584,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 	}
 	if (strcmp(op->op, "invite.qr") == 0) {
 		const char *url = op->payload[0] ? op->payload : NULL;
-		omaq_invite inv;
-		char canonical[OMAQ_URL_MAX];
+		char canonical[OMAQ_URL_MAX + 2];
 		char ev[OMAQ_URL_MAX + OMAQ_JSON_STR_MAX + 48];
 		char esc_url[OMAQ_JSON_STR_MAX];
 		char esc_path[OMAQ_JSON_STR_MAX];
@@ -11786,8 +12592,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 		if (!url)
 			url = g_issued_url[0] ? g_issued_url : NULL;
 #endif
-		if (!url || !op->path[0] || omaq_invite_parse(url, &inv) != 0 ||
-		    omaq_invite_format(&inv, canonical, sizeof(canonical)) != 0) {
+		if (!url || !op->path[0] || omaq_invite_normalize(url, canonical, sizeof(canonical)) != 0) {
 			emit_error("unsupported");
 			return 0;
 		}
@@ -11994,6 +12799,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			if (op->has_accept && op->accept) {
 				uint32_t fn;
 				int accept_rc, add_journal = 0;
+                int promote_probe=0;
 #ifdef HAVE_SIGNAL
 				char pending_key[65];
 				if (!g_issued_is_group) {
@@ -12003,6 +12809,7 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 						return 0;
 					}
 					pk_hex(g_pending_invite.public_key, pending_key);
+                    promote_probe=endpoint_owned(pending_key) && omaq_tox_friend_by_pk(g_tox,g_pending_invite.public_key)!=UINT32_MAX;
 					if (omaq_direct_state_add_begin(home_dir(), pending_key,
 								g_pending_invite.ratchet_key) != 0) {
 						emit_error("direct_state_migration_failed");
@@ -12012,14 +12819,14 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 					add_journal = 1;
 				}
 #endif
-				if (!direct_friend_capacity_available()) {
+				if (!promote_probe && !direct_friend_capacity_available()) {
 					if (add_journal)
 						(void)omaq_direct_state_add_finish(home_dir());
 					emit_error("forbidden");
 					emit_contact_decided(op->id, "forbidden");
 					return 0;
 				}
-				accept_rc = omaq_tox_friend_accept(g_tox, g_pending_invite.public_key);
+				accept_rc = promote_probe ? 0 : omaq_tox_friend_accept(g_tox, g_pending_invite.public_key);
 				if (accept_rc != 0) {
 					if (add_journal && accept_rc == OMAQ_TOX_ADD_STATE_FAILED)
 						fail_direct_state_backend();
@@ -12074,7 +12881,11 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 					char selfav[512];
 					uint8_t hid[32];
 
-					if (omaq_avatar_dest(home_dir(), "self", selfav, sizeof(selfav)) == 0 &&
+					if (
+#ifdef HAVE_SIGNAL
+                        friend_application_allowed(fn) &&
+#endif
+                        omaq_avatar_dest(home_dir(), "self", selfav, sizeof(selfav)) == 0 &&
 					    access(selfav, R_OK) == 0 &&
 					    avatar_hash_file(selfav, hid) == 0)
 						(void)omaq_file_send_avatar_begin(g_tox, fn, selfav, hid, NULL);
@@ -14045,7 +14856,10 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 			marker = 1;
 #ifdef HAVE_SIGNAL
 			if (g_ratchet) {
-				omaq_ratchet_close(g_ratchet);
+				#ifdef HAVE_TOX
+        harbor_sync_close(&g_device_sync);
+#endif
+        omaq_ratchet_close(g_ratchet);
 				g_ratchet = NULL;
 			}
 #endif
@@ -14142,7 +14956,10 @@ static int handle_op(const omaq_op *op, int *identity_ready, int owner_fd)
 identity_import_rollback:
 #ifdef HAVE_SIGNAL
 			if (g_ratchet) {
-				omaq_ratchet_close(g_ratchet);
+				#ifdef HAVE_TOX
+        harbor_sync_close(&g_device_sync);
+#endif
+        omaq_ratchet_close(g_ratchet);
 				g_ratchet = NULL;
 			}
 #endif
@@ -14218,6 +15035,37 @@ identity_import_rollback:
 		emit_error("unsupported");
 	return 0;
 }
+
+#ifdef HAVE_TOX
+static void accept_bearer_invite(void)
+{
+    omaq_op decision = {0};
+    int ready = 1;
+    if (!g_bearer_accept_pending)
+        return;
+    if (g_have_gauth || g_have_gpending)
+        return;
+    g_bearer_accept_pending = 0;
+    if (!g_issued_bearer || !g_pending_invite.used || g_issued_is_group)
+        return;
+    if (!g_issued_exp || (int64_t)time(NULL) >= g_issued_exp) {
+        clear_invite_and_emit();
+        return;
+    }
+    snprintf(decision.op, sizeof(decision.op), "contact.decide");
+    snprintf(decision.id, sizeof(decision.id), "bearer-invite");
+    pk_hex(g_pending_invite.public_key, decision.key);
+    decision.has_accept = decision.accept = 1;
+    decision.field_mask = OMAQ_JSON_FIELD_OP | OMAQ_JSON_FIELD_ID |
+        OMAQ_JSON_FIELD_KEY | OMAQ_JSON_FIELD_ACCEPT;
+    handle_op(&decision, &ready, -1);
+    // Failed automatic acceptance becomes an actionable request, never a retry loop.
+    if (g_pending_invite.used) {
+        g_issued_bearer = 0;
+        announce_pending_direct();
+    }
+}
+#endif
 
 static int serve_line(char *line, int *identity_ready)
 {
@@ -14400,7 +15248,7 @@ int main(int argc, char **argv)
 			hold = 1;
 	}
 	if (!home_dir() || !state_dir()) {
-		fprintf(stderr, "omaq: OMAQ_HOME and OMAQ_STATE required\n");
+		fprintf(stderr, "Harbor: HARBOR_HOME and HARBOR_STATE required (OMAQ aliases accepted)\n");
 		return 1;
 	}
 	omaq_rate_init(&g_rate);
@@ -14409,7 +15257,7 @@ int main(int argc, char **argv)
 	omaq_message_rate_init(&g_message_rate);
 	omaq_control_rate_init(&g_direct_control_rate);
 	omaq_line_reader_init(&g_stdin_reader);
-	if (ensure_private_directory(home_dir(), "OMAQ_HOME") != 0 ||
+	if (ensure_private_directory(home_dir(), "HARBOR_HOME") != 0 ||
 	    ensure_state_dir() != 0)
 		return 1;
 	rc = uninstall_marker_present();
@@ -14449,7 +15297,7 @@ int main(int argc, char **argv)
 			recovery_rc = -1;
 	}
 	if (recovery_rc < 0) {
-		fprintf(stderr, "omaq: identity replacement recovery failed\n");
+		fprintf(stderr, "harbor: identity replacement recovery failed\n");
 		g_identity_recovery_required = 1;
 		g_shutdown_after_drain = 1;
 	} else {
@@ -14462,7 +15310,7 @@ int main(int argc, char **argv)
 		g_identity_guard_state = omaq_identity_guard_preflight(home_dir(), state_dir());
 		if (g_identity_guard_state < 0) {
 			g_identity_guard_error = g_identity_guard_state;
-			fprintf(stderr, "omaq: existing identity is unavailable; refusing to create a replacement\n");
+			fprintf(stderr, "harbor: existing identity is unavailable; refusing to create a replacement\n");
 		} else if (g_identity_guard_state == OMAQ_IDENTITY_GUARD_RESTORED) {
 			g_identity_recovered = 1;
 		}
@@ -14479,7 +15327,7 @@ int main(int argc, char **argv)
 #else
 	if (attachment_stage_cleanup() != 0) {
 #endif
-		fprintf(stderr, "omaq: attachment staging cleanup failed\n");
+		fprintf(stderr, "harbor: attachment staging cleanup failed\n");
 		return 1;
 	}
 	omaq_unread_init(&g_unread);
@@ -14487,19 +15335,19 @@ int main(int argc, char **argv)
 	omaq_receipt_outbox_init(&g_receipt_outbox);
 	if (!g_identity_recovery_required &&
 	    omaq_receipt_outbox_load(&g_receipt_outbox, state_dir()) != 0) {
-		fprintf(stderr, "omaq: read receipt state is invalid; preserving it\n");
+		fprintf(stderr, "harbor: read receipt state is invalid; preserving it\n");
 		g_receipt_outbox_invalid = 1;
 	}
 #endif
 	if (!g_identity_recovery_required && omaq_store_unread_load(&g_unread, state_dir()) != 0) {
-		fprintf(stderr, "omaq: unread state is invalid; starting empty\n");
+		fprintf(stderr, "harbor: unread state is invalid; starting empty\n");
 		omaq_unread_init(&g_unread);
 		g_unread_load_failed = 1;
 		snprintf(g_unread_error_code, sizeof(g_unread_error_code),
 			 "unread_state_invalid");
 	}
 	if (init_instance_id() != 0) {
-		fprintf(stderr, "omaq: secure instance-id generation failed\n");
+		fprintf(stderr, "harbor: secure instance-id generation failed\n");
 		return 1;
 	}
 	if (bind_sock() != 0)
@@ -14508,7 +15356,7 @@ int main(int argc, char **argv)
 		return 1;
 	g_stdout_spool = omaq_stdout_spool_open(state_dir(), STDOUT_FILENO);
 	if (!g_stdout_spool) {
-		fprintf(stderr, "omaq: critical stdout spool open failed: %s\n",
+		fprintf(stderr, "harbor: critical stdout spool open failed: %s\n",
 			strerror(errno));
 		return 1;
 	}
@@ -14532,6 +15380,16 @@ int main(int argc, char **argv)
 #ifdef HAVE_TOX
 			if (g_tox && !g_identity_primary_uncertain) {
 				omaq_tox_iterate(g_tox);
+            accept_bearer_invite();
+#ifdef HAVE_SIGNAL
+            if (!device_link_prepare()) {
+                harbor_link_tick(&g_device_link);
+                harbor_endpoint_tick(&g_endpoint);
+                rendezvous_tick();
+                if(g_device_roster_changed || monotonic_millis()>=g_device_roster_retry)device_reconcile();
+                harbor_sync_tick(&g_device_sync);
+            }
+#endif
 				flush_friend_names();
 				group_file_pump();
 				flush_receipt_acknowledgements();
@@ -14698,6 +15556,16 @@ int main(int argc, char **argv)
 			enforce_call_control_lease();
 			reset_call_transport();
 			omaq_tox_iterate(g_tox);
+            accept_bearer_invite();
+#ifdef HAVE_SIGNAL
+            if (!device_link_prepare()) {
+                harbor_link_tick(&g_device_link);
+                harbor_endpoint_tick(&g_endpoint);
+                rendezvous_tick();
+                if(g_device_roster_changed || monotonic_millis()>=g_device_roster_retry)device_reconcile();
+                harbor_sync_tick(&g_device_sync);
+            }
+#endif
 			flush_friend_names();
 			group_file_pump();
 			flush_receipt_acknowledgements();
@@ -14737,7 +15605,10 @@ int main(int argc, char **argv)
 #endif
 #ifdef HAVE_SIGNAL
 	if (g_ratchet)
-		omaq_ratchet_close(g_ratchet);
+		#ifdef HAVE_TOX
+        harbor_sync_close(&g_device_sync);
+#endif
+        omaq_ratchet_close(g_ratchet);
 #endif
 	omaq_unread_destroy(&g_unread);
 	omaq_stdout_spool_close(g_stdout_spool);

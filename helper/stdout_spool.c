@@ -118,7 +118,7 @@ static int persist_cursor(omaq_stdout_spool *spool, off_t offset)
 static void warn_cursor(omaq_stdout_spool *spool)
 {
 	if (!spool->cursor_warned) {
-		fprintf(stderr, "omaq: critical stdout spool cursor update failed: %s\n",
+		fprintf(stderr, "harbor: critical stdout spool cursor update failed: %s\n",
 			strerror(errno));
 		spool->cursor_warned = 1;
 	}
@@ -173,7 +173,7 @@ static int quarantine_incomplete_tail(int dirfd, int fd, off_t start, off_t end)
 	close(out);
 	if (ftruncate(fd, start) != 0 || fdatasync(fd) != 0)
 		return -1;
-	fprintf(stderr, "omaq: quarantined incomplete critical stdout record as %s\n", name);
+	fprintf(stderr, "harbor: quarantined incomplete critical stdout record as %s\n", name);
 	return 0;
 
 fail:
@@ -297,7 +297,7 @@ static int load_cursor(omaq_stdout_spool *spool, off_t *cursor_out)
 			valid = 0;
 	}
 	if (!valid) {
-		fprintf(stderr, "omaq: invalid critical stdout spool cursor; replaying from start\n");
+		fprintf(stderr, "harbor: invalid critical stdout spool cursor; replaying from start\n");
 		*cursor_out = 0;
 		return persist_cursor(spool, 0);
 	}
@@ -441,7 +441,7 @@ int omaq_stdout_spool_append(omaq_stdout_spool *spool, const char *event)
 	if (write_all(spool->fd, record, len + 1) != 0) {
 		int saved = errno;
 		if (ftruncate(spool->fd, old_end) != 0 || fdatasync(spool->fd) != 0)
-			fprintf(stderr, "omaq: critical stdout spool rollback failed: %s\n",
+			fprintf(stderr, "harbor: critical stdout spool rollback failed: %s\n",
 				strerror(errno));
 		free(record);
 		errno = saved;

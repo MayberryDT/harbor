@@ -310,14 +310,15 @@ static int mkdir_p(const char *path)
 
 static int download_dir(const char *home, char *out, size_t n)
 {
-	const char *base = getenv("OMAQ_DOWNLOAD_DIR");
+	const char *base = getenv("HARBOR_DOWNLOAD_DIR");
 	const char *user_home;
 	struct passwd *pw;
 
+	if (!base || base[0] != '/') base = getenv("OMAQ_DOWNLOAD_DIR");
 	if (!base || base[0] != '/')
 		base = getenv("XDG_DOWNLOAD_DIR");
 	if (base && base[0] == '/')
-		return snprintf(out, n, "%s/omaq", base) < (int)n ? 0 : -1;
+		return snprintf(out, n, "%s/Harbor", base) < (int)n ? 0 : -1;
 	user_home = getenv("HOME");
 	if (!user_home || user_home[0] != '/') {
 		pw = getpwuid(getuid());
@@ -325,7 +326,7 @@ static int download_dir(const char *home, char *out, size_t n)
 	}
 	if (!user_home || user_home[0] != '/')
 		return -1;
-	return snprintf(out, n, "%s/Downloads/omaq", user_home) < (int)n ? 0 : -1;
+	return snprintf(out, n, "%s/Downloads/Harbor", user_home) < (int)n ? 0 : -1;
 }
 
 static FILE *open_download_file(const char *dir, const char *name,

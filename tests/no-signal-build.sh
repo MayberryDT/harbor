@@ -19,7 +19,7 @@ if "${CC:-cc}" -E -DHAVE_TOX -I"$root/helper" "$root/helper/omaq.c" \
 	cat "$out" >&2
 	exit 1
 fi
-grep -q 'OmaQ Tox transport requires Signal Ratchet support' "$out"
+grep -q 'Harbor Tox transport requires Signal Ratchet support' "$out"
 
 : >"$out"
 if make -C "$root" -B tests/omaq_group_admin_test_helper \

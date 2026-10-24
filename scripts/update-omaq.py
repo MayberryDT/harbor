@@ -1387,7 +1387,7 @@ def helper_call(
         "--root",
         str(root),
         "--state",
-        os.environ.get("OMAQ_STATE", str(Path.home() / ".local/state/omaq")),
+        os.environ.get("HARBOR_STATE") or os.environ.get("OMAQ_STATE", str(Path.home() / ".local/state/omaq")),
         "--root-identity",
         helper_root_identity(root),
         "--json",
@@ -2351,7 +2351,7 @@ def main(argv: list[str] | None = None) -> int:
             updater.update()
         return 0
     except (UpdateError, OSError, ValueError) as error:
-        print(f"update-omaq: {error}", file=sys.stderr)
+        print(f"update-harbor: {error}", file=sys.stderr)
         return 1
     finally:
         if updater is not None:

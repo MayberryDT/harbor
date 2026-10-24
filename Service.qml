@@ -6,7 +6,241 @@ Item {
   id: root
   signal chatSearchResult(string conversation, string key, string request, var items)
   property var settings: ({})
-  property bool muted: false
+  property bool muted: settings.notificationMuted === true
+  signal notificationMuteRequested(bool muted)
+  onSettingsChanged: root.muted = settings.notificationMuted === true
+  property bool supportsDeviceManagement: false
+  property var linkedDevices: []
+  property string devicePerson: ""
+  property string deviceLocal: ""
+  property bool deviceActive: false
+  property string deviceRequest: ""
+  property string deviceFeedback: ""
+  property bool deviceFeedbackError: false
+
+  property var identitySetup: null
+
+  function createIdentity(nickname, request) {
+    if (root.identitySetup || root.deviceLink || root.deviceBootstrap ||
+        root.selfNickname !== "" || !root.nicknameValid(nickname) || !request ||
+        !root.supportsIdentityActions) return false
+    root.identitySetup = {name: String(nickname).trim(), request: String(request)}
+    if (!root.manageDevice("device.initialize", "My computer", "", false)) {
+      root.identitySetup = null
+      return false
+    }
+    return true
+  }
+
+  function failIdentitySetup() {
+    var setup = root.identitySetup
+    root.identitySetup = null
+    if (setup) root.rejectBoundOperation({id: setup.request}, "identity_setup_failed")
+  }
+
+  signal deviceLinkInvitation()
+  property var deviceLink: null
+  property string deviceLinkError: ""
+
+  property var deviceBootstrap: null
+
+  function deviceErrorText(code) {
+    switch (String(code || "")) {
+    case "device_session_not_ready": return "The encrypted connection is still getting ready. Try again shortly."
+    case "device_name_invalid": return "Try a shorter computer name."
+    case "device_already_linked": return "This computer already belongs to an identity."
+    case "device_invite_required": return "Use a device-link invite from your existing computer."
+    case "invite_expired": return "This invite expired. Create a new one on your existing computer."
+    case "contact_exists": return "You are already connected. Choose your existing computer below."
+    case "device_link_busy": return "Finish the current linking request first."
+    case "device_link_expired": return "Linking expired. Start again on the new computer."
+    case "device_link_stale": return "The device list changed. Refresh and start linking again."
+    case "device_revoked": return "This computer no longer has access. Use another linked computer."
+    default: return "Harbor could not complete the device action. Refresh and try again."
+    }
+  }
+  function beginDeviceLink(url, name) {
+    if (!root.supportsDeviceManagement || !root.supportsInviteRequestSafety ||
+        root.identitySetup || root.deviceBootstrap || root.deviceLink || root.deviceRequest !== "" || root.linkedDevices.length ||
+        !String(url || "").trim() || !String(name || "").trim()) return false
+    var request = "link-invite-" + root.nextHistoryRequestId()
+    root.deviceBootstrap = {request: request, key: "", name: String(name).trim(),
+      expires: Date.now() + 300000}
+    root.deviceLinkError = ""
+    if (!root.sendImmediateOp({op: "invite.redeem", kind: "device", id: request,
+        payload: String(url).trim()})) {
+      root.deviceBootstrap = null
+      root.deviceLinkError = "Wait for Harbor to reconnect, then try again."
+      return false
+    }
+    deviceBootstrapTimer.restart()
+    return true
+  }
+  Timer {
+    id: deviceBootstrapTimer
+    interval: 2000
+    repeat: true
+    onTriggered: {
+      var bootstrap = root.deviceBootstrap
+      if (!bootstrap) { stop(); return }
+      if (Date.now() >= bootstrap.expires) {
+        root.deviceBootstrap = null
+        root.deviceLinkError = "Linking timed out. Check that both computers are online and try again."
+        stop()
+        return
+      }
+      if (!bootstrap.key || root.deviceLink) return
+      for (var i = 0; i < root.friends.length; i++) {
+        var friend = root.friends[i]
+        if (String(friend.key) === bootstrap.key && friend.online) {
+          root.requestDeviceLink(String(friend.id), bootstrap.key, bootstrap.name)
+          return
+        }
+      }
+    }
+  }
+
+  function requestDeviceLink(conversation, key, name) {
+    if (!root.supportsDeviceManagement || root.identitySetup || root.deviceLink ||
+        (root.deviceBootstrap && root.deviceBootstrap.key !== key) ||
+        !root.directBindingMatches(conversation, key) || !name.trim()) return false
+    var request = "link-ui-" + Date.now().toString(36) + "-" +
+      Math.floor(Math.random() * 0x100000000).toString(36)
+    if (!root.sendImmediateOp({op: "device.link.request", request: request,
+        conversation: String(conversation), key: key, nickname: name.trim(), accept: true})) {
+      root.deviceLinkError = "Wait for Harbor to reconnect, then try again."
+      return false
+    }
+    root.deviceLink = {request: request, key: key, state: "pending", name: name,
+      person: "", code: "", incoming: false}
+    root.deviceLinkError = ""
+    deviceLinkTimer.restart()
+    return true
+  }
+
+  function decideDeviceLink(accept) {
+    var link = root.deviceLink
+    if (!link || (link.state !== "requested" && link.state !== "verify")) return false
+    if (!accept && !link.incoming) return false
+    var operation = !accept ? "device.link.decline"
+      : link.incoming ? "device.link.accept" : "device.link.confirm"
+    if (!root.sendImmediateOp({op: operation, request: link.request,
+        key: link.person, accept: !!accept})) {
+      root.deviceLinkError = "Wait for Harbor to reconnect, then try again."
+      return false
+    }
+    root.deviceLink = {request: link.request, key: link.key, state: "working",
+      name: link.name, person: link.person, code: link.code, incoming: link.incoming}
+    return true
+  }
+
+  Timer {
+    id: deviceLinkTimer
+    interval: 300000
+    onTriggered: {
+      root.deviceLink = null
+      root.deviceLinkError = "Device linking expired. Start again on the new computer."
+    }
+  }
+
+  function manageDevice(operation, name, key, confirmed) {
+    if (operation === "device.initialize" && (root.deviceLink || root.deviceBootstrap)) return false
+    if (!root.supportsDeviceManagement || root.deviceRequest !== "" ||
+        root.awaitingHelperInstance || root.helperCompatibility !== "compatible")
+      return false
+    var request = "device-ui-" + Date.now().toString(36) + "-" +
+      Math.floor(Math.random() * 0x100000000).toString(36)
+    root.deviceRequest = request
+    root.deviceFeedback = "Working…"
+    root.deviceFeedbackError = false
+    if (!root.sendImmediateOp({ op: operation, request: request,
+        nickname: String(name || ""), key: String(key || ""), accept: !!confirmed })) {
+      root.deviceRequest = ""
+      root.deviceFeedback = "Wait for Harbor to reconnect, then try again."
+      root.deviceFeedbackError = true
+      return false
+    }
+    deviceOperationTimer.restart()
+    return true
+  }
+
+  Timer {
+    id: deviceOperationTimer
+    interval: 15000
+    onTriggered: {
+      root.deviceRequest = ""
+      root.deviceFeedback = "The device request timed out. Refresh to check its status."
+      root.failIdentitySetup()
+      root.deviceFeedbackError = true
+    }
+  }
+
+  property var conversationPreviews: ({})
+  property var previewQueue: []
+  property var previewRequest: null
+  property int previewRevision: 0
+
+  function previewStorageKey(conversation, key) {
+    var c = String(conversation || "")
+    if (/^g:[0-9a-f]{64}$/.test(c)) return c
+    return root.directBindingMatches(c, key) ? "d:" + key : ""
+  }
+  function conversationPreview(conversation, key) {
+    return root.conversationPreviews[root.previewStorageKey(conversation, key)] ||
+      {id: "", text: "", ts: 0}
+  }
+  function setConversationPreview(conversation, key, item) {
+    var stored = root.previewStorageKey(conversation, key)
+    if (!stored) return
+    var next = {}
+    for (var k in root.conversationPreviews) next[k] = root.conversationPreviews[k]
+    var text = !item ? "" : item.deleted ? "Message removed"
+      : item.kind === "image" ? "Photo" : item.kind === "file" ? "File"
+      : String(item.text || "").replace(/\s+/g, " ").slice(0, 160)
+    next[stored] = {id: item ? String(item.id || "") : "", text: text,
+      ts: item ? Math.max(0, Number(item.ts || 0)) : 0}
+    root.conversationPreviews = next
+    root.previewRevision++
+  }
+  function refreshConversationPreviews() {
+    if (!root.friendsReady || (root.activeHelperProtocol >= 13 && !root.groupsReady) ||
+        root.previewRequest || root.previewQueue.length) return
+    var queue = []
+    for (var i = 0; i < root.friends.length; i++) {
+      var friend = root.friends[i]
+      if (root.directBindingMatches(String(friend.id), String(friend.key)))
+        queue.push({conversation: String(friend.id), key: String(friend.key)})
+    }
+    for (var j = 0; j < root.groups.length; j++) {
+      var group = String(root.groups[j].id || "")
+      if (/^g:[0-9a-f]{64}$/.test(group)) queue.push({conversation: group, key: ""})
+    }
+    root.previewQueue = queue.slice(0, 128)
+    previewFetchTimer.restart()
+  }
+  function fetchNextPreview() {
+    if (root.previewRequest || !root.previewQueue.length) return
+    var target = root.previewQueue[0]
+    root.previewQueue = root.previewQueue.slice(1)
+    var request = "preview-" + root.nextHistoryRequestId()
+    root.previewRequest = {conversation: target.conversation, key: target.key,
+      request: request, revision: root.previewRevision}
+    if (!root.previewStorageKey(target.conversation, target.key) ||
+        !root.sendImmediateOp({op: "history", conversation: target.conversation,
+          key: target.key, id: request, limit: 1})) {
+      root.previewRequest = null
+      previewFetchTimer.restart()
+      return
+    }
+    previewTimeout.restart()
+  }
+  Timer { id: previewFetchTimer; interval: 150; onTriggered: root.fetchNextPreview() }
+  Timer {
+    id: previewTimeout
+    interval: 5000
+    onTriggered: { root.previewRequest = null; previewFetchTimer.restart() }
+  }
+
   property int unreadCount: 0
   property var unreadByConversation: ({})
   property bool authoritativeUnreadSeen: false
@@ -335,14 +569,14 @@ Item {
   property bool recoveringHelper: false
 
   readonly property string helperPath: String(Qt.resolvedUrl("helper/omaq")).replace(/^file:\/\//, "")
-  readonly property string homeDir: Quickshell.env("OMAQ_HOME") || (Quickshell.env("HOME") + "/.local/share/omaq")
-  readonly property string stateDir: Quickshell.env("OMAQ_STATE") || (Quickshell.env("HOME") + "/.local/state/omaq")
+  readonly property string homeDir: Quickshell.env("HARBOR_HOME") || Quickshell.env("OMAQ_HOME") || (Quickshell.env("HOME") + "/.local/share/omaq")
+  readonly property string stateDir: Quickshell.env("HARBOR_STATE") || Quickshell.env("OMAQ_STATE") || (Quickshell.env("HOME") + "/.local/state/omaq")
   readonly property string sockPath: stateDir + "/omaq.sock"
   readonly property string defaultQrPath: {
     var d = Quickshell.env("XDG_DOWNLOAD_DIR")
     if (!d || d === "")
       d = (Quickshell.env("HOME") || "") + "/Downloads"
-    return d + "/omaq-invite.png"
+    return d + "/harbor-invite.png"
   }
 
   function localUnreadTotal() {
@@ -1100,6 +1334,19 @@ Item {
           root.pendingDirectEventOverflow = false
         }
         if (processChanged) {
+          if (root.identitySetup) root.deviceFeedback = "Harbor restarted during setup. Try again."
+          root.failIdentitySetup()
+          if (root.deviceLink || root.deviceBootstrap) root.deviceLinkError = "Harbor restarted. Start device linking again."
+          root.deviceLink = null
+          root.deviceBootstrap = null
+          deviceBootstrapTimer.stop()
+          deviceLinkTimer.stop()
+          root.deviceRequest = ""
+          deviceOperationTimer.stop()
+          root.previewRequest = null
+          root.previewQueue = []
+          previewTimeout.stop()
+          previewFetchTimer.stop()
           root.clearPendingRequest()
           root.customSounds = []
           root.soundTick = root.soundTick + 1
@@ -1120,6 +1367,8 @@ Item {
           root.resetStateForIdentity()
         root.helperInstance = nextInstance
         root.activeHelperProtocol = snapshotProtocol
+        root.supportsBearerInvites = ev.bearerInvites === true
+        root.supportsDeviceManagement = Number(ev.deviceManagement) === 1
         root.supportsCorrelatedHistoryClear = Number(ev.historyClear) === 2
         root.callReplayRequest = snapshotProtocol >= 15 ? String(ev.request || "") : ""
         root.callReplayInstance = snapshotProtocol >= 15 ? nextInstance : ""
@@ -1309,6 +1558,111 @@ Item {
         root.resolveCallControlUnknown(true)
       return
     }
+    if (ev.event === "devices.error" && root.deviceLink &&
+        String(ev.request || "") === root.deviceLink.request) {
+      root.deviceLink = null
+      if (root.deviceBootstrap && ev.code === "device_session_not_ready") return
+      root.deviceBootstrap = null
+      deviceBootstrapTimer.stop()
+      root.deviceLinkError = root.deviceErrorText(ev.code)
+      deviceLinkTimer.stop()
+      return
+    }
+    if (ev.event === "device.link" && root.supportsDeviceManagement) {
+      var linkRequest = String(ev.request || "")
+      var linkKey = String(ev.key || "")
+      var linkState = String(ev.state || "")
+      var oldLink = root.deviceLink
+      if (!linkRequest || !/^[0-9a-f]{64}$/.test(linkKey)) return
+      if (oldLink && ["linked", "sent", "declined"].indexOf(oldLink.state) >= 0 &&
+          (oldLink.request !== linkRequest || oldLink.key !== linkKey)) oldLink = null
+      if (oldLink && (oldLink.request !== linkRequest || oldLink.key !== linkKey)) return
+      if (typeof ev.incoming !== "boolean") return
+      if (!oldLink && ["requested", "verify", "pending", "waiting-for-owner", "waiting-for-device"].indexOf(linkState) < 0) return
+      if (["pending", "requested", "verify", "waiting-for-device", "waiting-for-owner",
+           "awaiting-confirmation", "linked", "sent", "declined"].indexOf(linkState) < 0) return
+      if ((linkState === "requested" || linkState === "verify") &&
+          (!/^[0-9a-f]{64}$/.test(String(ev.person || "")) ||
+           !/^[0-9a-f]{64}$/.test(String(ev.code || "")))) return
+      root.deviceLink = {request: linkRequest, key: linkKey, state: linkState,
+        name: String(ev.name || ""), person: String(ev.person || ""),
+        code: String(ev.code || ""), incoming: ev.incoming}
+      root.deviceLinkError = ""
+      if (root.deviceBootstrap && root.deviceBootstrap.key === linkKey) {
+        root.deviceBootstrap = null
+        deviceBootstrapTimer.stop()
+      }
+      if (!oldLink) {
+        deviceLinkTimer.restart()
+        if (ev.incoming) root.deviceLinkInvitation()
+      }
+      if (linkState === "linked" || linkState === "sent" || linkState === "declined") {
+        deviceLinkTimer.stop()
+        root.manageDevice("device.status", "", "", false)
+      }
+      return
+    }
+    if ((ev.event === "devices" || ev.event === "devices.error") &&
+        root.deviceRequest !== "" && String(ev.request || "") === root.deviceRequest) {
+      deviceOperationTimer.stop()
+      root.deviceRequest = ""
+      root.deviceFeedbackError = ev.event === "devices.error"
+      if (root.deviceFeedbackError) {
+        if (ev.code === "device_not_linked" && root.linkedDevices.length === 0) {
+          root.deviceFeedback = "This computer is ready to use. Add a computer to connect your devices."
+          root.deviceFeedbackError = false
+          return
+        }
+        root.deviceFeedback = root.deviceErrorText(ev.code)
+        root.failIdentitySetup()
+        return
+      }
+      var items = ev.items
+      var deviceSeen = ({})
+      var valid = Array.isArray(items) && items.length <= 32 &&
+        /^[0-9a-f]{64}$/.test(String(ev.person || "")) &&
+        /^[0-9a-f]{64}$/.test(String(ev.local || ""))
+      var activeDevices = 0
+      var currentDevices = 0
+      var currentActive = false
+      for (var di = 0; valid && di < items.length; di++) {
+        if (!items[di] || typeof items[di] !== "object") { valid = false; break }
+        var dk = String(items[di].key || "")
+        valid = /^[0-9a-f]{64}$/.test(dk) && !deviceSeen[dk] &&
+          typeof items[di].name === "string" && typeof items[di].active === "boolean" &&
+          typeof items[di].current === "boolean"
+        if (items[di].active) activeDevices++
+        if (items[di].current) { currentDevices++; currentActive = items[di].active }
+        valid = valid && items[di].current === (dk === String(ev.local))
+        deviceSeen[dk] = true
+      }
+      valid = valid && activeDevices === Number(ev.count) && currentDevices <= 1 &&
+        typeof ev.active === "boolean" && ev.active === currentActive
+      if (!valid) {
+        root.deviceFeedback = "Harbor could not read the complete device list. Refresh to try again."
+        root.failIdentitySetup()
+        root.deviceFeedbackError = true
+        return
+      }
+      root.linkedDevices = items
+      root.devicePerson = String(ev.person)
+      root.deviceLocal = String(ev.local)
+      root.deviceActive = ev.active
+      root.deviceFeedback = ""
+      if (root.identitySetup) {
+        if (!root.deviceActive || currentDevices !== 1) {
+          root.deviceFeedback = "Identity setup did not activate this computer. Try again."
+          root.failIdentitySetup()
+        } else {
+          var setup = root.identitySetup
+          if (root.setNickname(setup.name, setup.request)) root.identitySetup = null
+          else {
+            root.deviceFeedback = "Identity created. Reconnect and try saving your name again."
+            root.failIdentitySetup()
+          }
+        }
+      }
+    }
     if (ev.event === "connection" && !root.awaitingHelperInstance) {
       if (ev.state === "online") {
         root.connectionState = "online"
@@ -1368,6 +1722,11 @@ Item {
           return
         }
       }
+      if (root.deviceBootstrap && root.deviceBootstrap.request === redeemedRequest) {
+        var bootstrap = root.deviceBootstrap
+        root.deviceBootstrap = {request: bootstrap.request, name: bootstrap.name,
+          expires: bootstrap.expires, key: String(ev.key || "")}
+      }
       root.lastRedeemRequest = redeemedRequest
       root.lastRedeemKind = redeemedKind
       root.lastRedeemSafety = redeemedSafety
@@ -1398,6 +1757,11 @@ Item {
       root.nicknameTick = root.nicknameTick + 1
     }
     if (ev.event === "error") {
+      if (root.deviceBootstrap && String(ev.request || "") === root.deviceBootstrap.request) {
+        root.deviceLinkError = root.deviceErrorText(ev.code)
+        root.deviceBootstrap = null
+        deviceBootstrapTimer.stop()
+      }
       root.lastError = ev.code || "error"
       root.lastErrorConv = ev.conversation || ""
       root.lastErrorRequest = String(ev.request || "")
@@ -1589,6 +1953,9 @@ Item {
       }
       root.lastChatConv = ev.conversation || root.lastConversation
       root.lastChatText = ev.text || ""
+      var currentPreview = root.conversationPreview(messageConversation, messageKey)
+      if (Number(ev.ts || 0) >= currentPreview.ts)
+        root.setConversationPreview(messageConversation, messageKey, ev)
       root.messageTick = root.messageTick + 1
     }
     if (ev.event === "search") {
@@ -1609,6 +1976,12 @@ Item {
       root.lastUpdateId = String(ev.id || "")
       root.lastUpdateText = String(ev.text || "")
       root.lastUpdateDeleted = !!ev.deleted
+      var updatedPreviewKey = root.friendKeyForConversation(root.lastUpdateConv)
+      var updatedPreview = root.conversationPreview(root.lastUpdateConv, updatedPreviewKey)
+      root.previewRevision++
+      if (updatedPreview.id === root.lastUpdateId)
+        root.setConversationPreview(root.lastUpdateConv, updatedPreviewKey,
+          {id: root.lastUpdateId, text: root.lastUpdateText, deleted: !!ev.deleted, ts: updatedPreview.ts})
       root.lastUpdateEdited = !!ev.edited
       root.updateTick = root.updateTick + 1
     }
@@ -1646,6 +2019,24 @@ Item {
       root.completeHistoryClear(String(ev.conversation || ""),
         String(ev.request || ""), ev.event === "history.clear.succeeded",
         clearCode)
+    }
+    if ((ev.event === "history" || ev.event === "history.failed") &&
+        String(ev.request || "").indexOf("preview-") === 0) {
+      var preview = root.previewRequest
+      if (!preview || String(ev.request) !== preview.request ||
+          String(ev.conversation || "") !== preview.conversation ||
+          (ev.event === "history" && String(ev.key || "") !== preview.key)) return
+      root.previewRequest = null
+      previewTimeout.stop()
+      if (ev.event === "history" && !ev.cleared && Array.isArray(ev.items) &&
+          preview.revision === root.previewRevision &&
+          root.previewStorageKey(preview.conversation, preview.key)) {
+        var tail = ev.items.length ? ev.items[ev.items.length - 1] : null
+        if (!tail || typeof tail === "object")
+          root.setConversationPreview(preview.conversation, preview.key, tail)
+      }
+      previewFetchTimer.restart()
+      return
     }
     if (ev.event === "history.failed") {
       var failedHistoryConv = String(ev.conversation || "")
@@ -1898,6 +2289,12 @@ Item {
       root.soundTick = root.soundTick + 1
     }
     if (ev.event === "invite") {
+      if (ev.qr) {
+        if (root.inviteUrl !== "" && String(ev.url || "") === root.inviteUrl)
+          root.qrPath = String(ev.qr)
+        return
+      }
+      root.inviteBearer = ev.bearer === true
       if (ev.url !== undefined)
         root.inviteUrl = String(ev.url || "")
       if (ev.expires !== undefined) {
@@ -2946,9 +3343,13 @@ Item {
     return root.sendSoundOperation("remove", { id: soundId }, request)
   }
 
-  function createInvite(request) {
-    return sendImmediateOp({ op: "invite.create", kind: "direct", ttlSec: 86400,
-      request: String(request || "") })
+  property bool supportsBearerInvites: false
+  property bool inviteBearer: false
+
+  function createInvite(request, requireApproval, lifetime) {
+    return sendImmediateOp({ op: "invite.create", kind: "direct", ttlSec: lifetime === 300 ? 300 : 86400,
+      request: String(request || ""),
+      accept: root.supportsBearerInvites && !requireApproval })
   }
   function revokeInvite(request) {
     return sendImmediateOp({ op: "invite.revoke", request: String(request || "") })
@@ -3010,6 +3411,7 @@ Item {
 
   function toggleMute() {
     root.muted = !root.muted
+    root.notificationMuteRequested(root.muted)
   }
 
   function unreadFor(conv) {
@@ -3097,6 +3499,7 @@ Item {
              String(code || "") === "helper_incompatible")
       root.setHistoryClearReloadRequired(c, true)
     if (succeeded) {
+      root.setConversationPreview(c, root.friendKeyForConversation(c), null)
       root.pendingHistoryUnread = root.withoutConversation(
         root.pendingHistoryUnread, c)
       root.historyRetryTickByConversation = root.withoutConversation(
@@ -4010,6 +4413,24 @@ Item {
   }
 
   function resetStateForIdentity(expectedImport) {
+    root.failIdentitySetup()
+    deviceOperationTimer.stop()
+    root.deviceRequest = ""
+    root.deviceFeedback = ""
+    root.deviceLink = null
+    root.deviceBootstrap = null
+    deviceBootstrapTimer.stop()
+    root.deviceLinkError = ""
+    deviceLinkTimer.stop()
+    root.conversationPreviews = ({})
+    root.previewQueue = []
+    root.previewRequest = null
+    previewTimeout.stop()
+    previewFetchTimer.stop()
+    root.linkedDevices = []
+    root.devicePerson = ""
+    root.deviceLocal = ""
+    root.deviceActive = false
     root.failPendingHistoryClears("identity_changed")
     root.failActiveOutgoingFiles("identity_replaced")
     root.failInFlightMessages("delivery_unknown")
@@ -4482,6 +4903,8 @@ Item {
     id: proc
     command: [root.helperPath]
     environment: ({
+      "HARBOR_HOME": root.homeDir,
+      "HARBOR_STATE": root.stateDir,
       "OMAQ_HOME": root.homeDir,
       "OMAQ_STATE": root.stateDir,
       "OMAQ_PROTOCOL_NONCE": root.helperLaunchNonce

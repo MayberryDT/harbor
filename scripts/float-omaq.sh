@@ -37,7 +37,7 @@ if [[ "$MODE" != "observe-title" && "$MODE" != "list-geometry" ]] &&
   LUA=1
 fi
 INSTANCE_KEY=$(printf '%s' "$INSTANCE_SIGNATURE" | sha256sum | cut -d' ' -f1)
-RULE_FLAG="$RULE_DIR/rules-v2.${INSTANCE_KEY}"
+RULE_FLAG="$RULE_DIR/rules-v3.${INSTANCE_KEY}"
 WATCH_LOCK="$RULE_DIR/rules.${INSTANCE_KEY}.watch.lock"
 SCRIPT_PATH=$(readlink -f -- "$0") || exit 1
 BASH_PATH=$(readlink -f -- /bin/bash) || exit 1
@@ -165,7 +165,7 @@ install_rules() {
     # Named Lua rules are removed when their returned handles are collected.
     # Retain both handles in Hyprland's global Lua state across hyprctl calls.
     hyprctl eval 'harbor_window_rules = harbor_window_rules or {}; if harbor_window_rules.demo_v4 == nil then harbor_window_rules.demo_v4 = hl.window_rule({ name = "harbor-float-demo-v4", match = { initial_title = "^Harbor demo$" }, float = true, no_anim = true }) else harbor_window_rules.demo_v4:set_enabled(true) end' >/dev/null || return 1
-    hyprctl eval 'harbor_window_rules = harbor_window_rules or {}; if harbor_window_rules.chat_v5 ~= nil then harbor_window_rules.chat_v5:set_enabled(false) end; if harbor_window_rules.chat_v6 == nil then harbor_window_rules.chat_v6 = hl.window_rule({ name = "harbor-float-chat-v6", match = { initial_title = "^Harbor chat.*$" }, float = true }) else harbor_window_rules.chat_v6:set_enabled(true) end' >/dev/null || return 1
+    hyprctl eval 'harbor_window_rules = harbor_window_rules or {}; if harbor_window_rules.chat_v5 ~= nil then harbor_window_rules.chat_v5:set_enabled(false) end; if harbor_window_rules.chat_v6 ~= nil then harbor_window_rules.chat_v6:set_enabled(false) end; if harbor_window_rules.chat_v7 == nil then harbor_window_rules.chat_v7 = hl.window_rule({ name = "harbor-float-chat-v7", match = { initial_title = "^Harbor chat.*$" }, float = true, no_initial_focus = true }) else harbor_window_rules.chat_v7:set_enabled(true) end' >/dev/null || return 1
     return 0
   fi
 
@@ -186,7 +186,8 @@ install_rules() {
     if ! hyprctl keyword 'windowrulev2 = unset, title:^(Harbor chat.*)$' >/dev/null ||
        ! hyprctl keyword 'windowrulev2 = float, title:^(Harbor demo)$' >/dev/null ||
        ! hyprctl keyword 'windowrulev2 = noanim, title:^(Harbor demo)$' >/dev/null ||
-       ! hyprctl keyword 'windowrulev2 = float, title:^(Harbor chat.*)$' >/dev/null; then
+       ! hyprctl keyword 'windowrulev2 = float, title:^(Harbor chat.*)$' >/dev/null ||\
+       ! hyprctl keyword 'windowrulev2 = noinitialfocus, title:^(Harbor chat.*)$' >/dev/null; then
       flock -u 9
       exec 9>&-
       return 1

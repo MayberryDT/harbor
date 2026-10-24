@@ -18,3 +18,5 @@ __pycache__/
 /src
 *.pkg.tar*
 .DS_Store
+
+/tests/harbor-sync-fault-helper

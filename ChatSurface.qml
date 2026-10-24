@@ -17,8 +17,7 @@ Item {
   property var settings: ({})
   property string instanceName: "default"
 
-  readonly property bool notifyRight: setting("notifyRightPanel", false)
-  readonly property bool notifyDesk: setting("notifyDesktop", false)
+  readonly property bool notifyDesk: setting("notifyDesktop", true)
   readonly property bool animateUnread: setting("animateUnread", true)
   readonly property string surfaceMode: String(setting("surfaceMode", "separate"))
   readonly property string soundName: {
@@ -39,6 +38,10 @@ Item {
   readonly property var openCards: openCardModel
   property bool surfacesHydrated: false
   property string pulseConv: ""
+  property double lastNotificationSoundAt: 0
+  property string soundWarning: ""
+  property string notificationWarning: ""
+  property var pendingDesktopNotifications: []
   readonly property bool demoOpen: Harbor.SurfaceCoordinator.demoOpen
   readonly property bool isSurfaceOwner: Harbor.SurfaceCoordinator.owner === root
   property bool ownershipTeardown: false
@@ -47,6 +50,7 @@ Item {
   property int geometryGeneration: 0
   property int geometrySnapshotGeneration: -1
   property string lastNotifiedMessageId: ""
+  property string lastNotifiedFileId: ""
   property string activeCustomSoundId: ""
   property string activeCustomSoundPath: ""
   property string focusConversation: ""
@@ -78,8 +82,6 @@ Item {
   readonly property color receiptSentColor: root.paletteColor("color05", root.theme().accent || Color.accent)
   readonly property color receiptDeliveredColor: root.paletteColor("color04", root.theme().fg || Color.foreground)
   readonly property color receiptReadColor: root.paletteColor("color03", root.theme().accent || Color.accent)
-  readonly property string notificationConversation: service
-    ? String(service.lastChatConv || service.lastConversation || "") : ""
   readonly property color headerNameColor: root.paletteColor("color03", root.theme().accent || Color.accent)
   readonly property color headerStatusColor: root.paletteColor("color02", root.theme().accent || Color.accent)
 
@@ -975,8 +977,11 @@ Item {
     var path = selectedSound === "custom" ? root.managedCustomSoundPath() : ""
     if (selectedSound !== "custom")
       path = String(Qt.resolvedUrl("sounds/" + root.packagedSoundFile(selectedSound))).replace(/^file:\/\//, "")
-    if (!path)
+    if (!path) {
+      root.soundWarning = "Choose an available notification sound in Settings."
       return
+    }
+    root.soundWarning = ""
     sndProc.command = [
       "bash", "-c",
       "if command -v ffplay >/dev/null 2>&1; then exec ffplay -nodisp -autoexit -loglevel quiet \"$1\"; elif command -v mpv >/dev/null 2>&1; then exec mpv --no-video --really-quiet \"$1\"; elif command -v pw-play >/dev/null 2>&1; then exec pw-play \"$1\"; else exit 127; fi",
@@ -996,15 +1001,46 @@ Item {
     root.playNamedSound(name)
   }
 
-  function desktopNotify() {
-    if (!notifyDesk)
-      return
-    noteProc.command = ["notify-send", "-a", "Harbor", "Harbor", "New message"]
-    noteProc.running = true
+  function queueDesktopFallback(conversation, key, messageId, isFile) {
+    if (!root.notifyDesk) return
+    var pending = root.pendingDesktopNotifications.filter(function(item) {
+      return item.conversation !== conversation || item.key !== key || item.file !== isFile
+    })
+    pending.push({conversation: conversation, key: key, id: messageId,
+      file: isFile, after: Date.now() + 750})
+    root.pendingDesktopNotifications = pending.slice(-32)
+  }
+  Timer {
+    interval: 250
+    repeat: true
+    running: root.isSurfaceOwner && root.pendingDesktopNotifications.length > 0
+    onTriggered: {
+      if (noteProc.running) return
+      var item = root.pendingDesktopNotifications[0]
+      if (!item || Date.now() < item.after) return
+      root.pendingDesktopNotifications = root.pendingDesktopNotifications.slice(1)
+      if (!root.notifyDesk || !root.autoOpenFor(item.conversation, item.key)) return
+      if (item.conversation.charAt(0) === "g" && root.service.groupsReady &&
+          !root.service.groupById(item.conversation)) return
+      if (item.file) {
+        var offer = root.service.fileOffer(item.conversation)
+        if (!offer.pending || String(offer.id) !== item.id ||
+            (item.key && String(offer.key) !== item.key)) return
+      }
+      var index = root.cardIndex(item.conversation, item.key)
+      var window = index >= 0 ? root.pinWindowAt(index) : null
+      if (root.floatRulesReady && index >= 0 &&
+          (root.surfaceMode === "bundled" || (window && window.visible))) return
+      root.notificationWarning = ""
+      noteProc.command = ["notify-send", "-a", "Harbor", "Harbor",
+        item.file ? "Incoming file" : "New message"]
+      noteProc.running = true
+    }
   }
 
   function onIncoming(conv, snapshot) {
     var event = snapshot || ({})
+    var isFile = event.kind === "file"
     var key = String(event.conversation || conv || "")
     var messageId = event.id !== undefined
       ? String(event.id || "") : (service ? String(service.lastChatId || "") : "")
@@ -1020,29 +1056,56 @@ Item {
     if (!service || !key || messageDir !== "in" || !messageText ||
         (key.charAt(0) !== "g" && !service.directBindingMatches(key, messageKey)))
       return
+    if (key.charAt(0) === "g" && service.groupsReady && !service.groupById(key))
+      return
+    // A queued offer may have been declined, canceled, or replaced while loading preferences.
+    if (isFile) {
+      var offer = service.fileOffer(key)
+      if (!offer.pending || String(offer.id || "") !== messageId ||
+          (key.charAt(0) !== "g" && String(offer.key || "") !== messageKey))
+        return
+    }
     if (!root.autoOpenLoaded) {
       if (messageId) {
         var queuedIndex
         for (queuedIndex = 0; queuedIndex < root.pendingIncoming.length; queuedIndex++) {
-          if (root.pendingIncoming[queuedIndex].id === messageId)
+          if (root.pendingIncoming[queuedIndex].id === messageId &&
+              root.pendingIncoming[queuedIndex].conversation === key &&
+              root.pendingIncoming[queuedIndex].key === messageKey &&
+              root.pendingIncoming[queuedIndex].kind === (isFile ? "file" : "message"))
             return
         }
+        if (root.pendingIncoming.length >= 128) root.pendingIncoming.shift()
         root.pendingIncoming.push({ conversation: key, key: messageKey, id: messageId,
-          text: messageText, dir: messageDir })
+          text: messageText, dir: messageDir, kind: isFile ? "file" : "message" })
       }
       return
     }
-    if (!messageId || key + "|" + messageId === root.lastNotifiedMessageId)
+    var noticeId = key + "|" + messageKey + "|" + messageId
+    if (!messageId || noticeId === (isFile ? root.lastNotifiedFileId : root.lastNotifiedMessageId))
       return
     var directKey = key.charAt(0) === "g" ? "" : messageKey
-    root.lastNotifiedMessageId = key + "|" + messageId
+    if (isFile)
+      root.lastNotifiedFileId = noticeId
+    else
+      root.lastNotifiedMessageId = noticeId
     if (root.autoOpenFor(key, directKey))
       ensureCard(key, "", directKey)
     if (animateUnread)
       pulseConv = key
-    playSound()
+    var windowIndex = root.cardIndex(key, directKey)
+    var window = windowIndex >= 0 ? root.pinWindowAt(windowIndex) : null
+    var alreadyReading = window && window.conversationReadActive
+    if (isFile || !alreadyReading) {
+      var now = Date.now()
+      if (isFile || now - root.lastNotificationSoundAt >= 800) {
+        root.lastNotificationSoundAt = now
+        playSound()
+      }
+    }
+    // Desktop alerts are a fallback when a chat surface could not be presented.
     if (root.autoOpenFor(key, directKey))
-      desktopNotify()
+      root.queueDesktopFallback(key, directKey, messageId, isFile)
   }
 
   Connections {
@@ -1058,6 +1121,21 @@ Item {
       })
     }
     function onMessageTickChanged() { handleIncoming() }
+    function onLastFileTickChanged() {
+      if (service.lastFileState !== "offer" || service.lastFileDir !== "in") {
+        // Direct transfer numbers can be reused after completion or cancellation.
+        if (["done", "canceled", "failed"].indexOf(service.lastFileState) >= 0 &&
+            root.lastNotifiedFileId.indexOf(String(service.lastFileConv || "") + "|") === 0)
+          root.lastNotifiedFileId = ""
+        return
+      }
+      var conversation = String(service.lastFileConv || "")
+      var offer = service.fileOffer(conversation)
+      root.onIncoming(conversation, {
+        conversation: conversation, id: String(offer.id || ""),
+        key: String(offer.key || ""), text: "Incoming file", dir: "in", kind: "file"
+      })
+    }
     function onSurfacesTickChanged() { root.restoreSurfaces() }
     function onGroupsTickChanged() { root.reconcileOpenGroups() }
     function onFriendsTickChanged() { root.reconcileOpenCards() }
@@ -1065,10 +1143,16 @@ Item {
     function onSoundTickChanged() { root.stopUntrustedCustomSound() }
     function onHelperCompatibilityChanged() { root.stopUntrustedCustomSound() }
     function onActiveHelperProtocolChanged() { root.stopUntrustedCustomSound() }
-    function onHelperInstanceGenerationChanged() { root.stopUntrustedCustomSound() }
+    function onHelperInstanceGenerationChanged() {
+      root.stopUntrustedCustomSound()
+      root.lastNotifiedFileId = ""
+    }
     function onHelperHandshakeTickChanged() {
       if (!root.service)
         return
+      // Startup requests can be discarded when the helper identity changes.
+      // Reload geometry after the handshake so explicit opens cannot stay queued.
+      root.service.sendOp({ op: "surface.list" })
       if (root.autoOpenRequest !== "") {
         if (!root.service.requestAutoOpen(root.autoOpenRequest))
           root.failAutoOpenLoad(
@@ -1080,7 +1164,11 @@ Item {
     function onRemovedGroupTickChanged() { root.closeRemovedGroup(service.lastRemovedGroup) }
     function onIdentityTickChanged() {
       root.clearCards()
+      root.service.sendOp({ op: "surface.list" })
       root.pendingIncoming = []
+      root.pendingDesktopNotifications = []
+      root.lastNotifiedMessageId = ""
+      root.lastNotifiedFileId = ""
       root.focusConversation = ""
       root.autoOpenByConversation = ({})
       root.autoOpenUnavailable = false
@@ -1093,8 +1181,19 @@ Item {
     }
   }
 
-  Process { id: sndProc }
-  Process { id: noteProc }
+  Process {
+    id: sndProc
+    onExited: function(code) {
+      if (code !== 0 && !root.muted)
+        root.soundWarning = "Notification sound could not play. Check your audio output and try Test sound."
+    }
+  }
+  Process {
+    id: noteProc
+    onExited: function(code) {
+      if (code !== 0) root.notificationWarning = "Desktop notification could not be shown. Check your desktop notification service."
+    }
+  }
   Process {
     id: installFloatRules
     command: [root.floatScriptPath, "install-rules"]
@@ -1351,65 +1450,31 @@ Item {
     }
   }
 
-  PanelWindow {
-    id: rightDock
-    visible: root.isSurfaceOwner && root.notifyRight && service && service.lastChatDir === "in" &&
-      service.lastChatText !== "" &&
-      (root.notificationConversation.charAt(0) === "g" ||
-       service.directBindingMatches(root.notificationConversation, service.lastChatKey)) &&
-      root.autoOpenFor(root.notificationConversation, service.lastChatKey)
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.namespace: "omaq-dock"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    anchors { top: true; bottom: true; right: true }
-    implicitWidth: Style.space(300)
-
-    ColumnLayout {
-      anchors.fill: parent
-      anchors.margins: Style.space(8)
-      spacing: Style.space(4)
-
-      RowLayout {
-        Layout.fillWidth: true
-        CallToolbar { page: rightDockPage }
-        Item { Layout.fillWidth: true }
-      }
-
-      Pages.ChatPage {
-        id: rightDockPage
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        service: root.service
-        theme: root.theme()
-        messageScale: root.messageScale
-        conversation: root.notificationConversation
-        peerKey: String(service.lastChatKey || "")
-        peerName: root.friendLabel(root.notificationConversation)
-        peerAvatar: root.friendAvatar(root.notificationConversation)
-        peerAvatarRevision: root.service ? root.service.avatarTick : 0
-        peerOnline: root.friendOnline(root.notificationConversation)
-        peerNameColor: root.headerNameColor
-        peerStatusColor: root.headerStatusColor
-        receiptSentColor: root.receiptSentColor
-        receiptDeliveredColor: root.receiptDeliveredColor
-        receiptReadColor: root.receiptReadColor
-        autoOpenEnabled: root.autoOpenFor(root.notificationConversation,
-          service.lastChatKey)
-        onAutoOpenToggled: root.toggleAutoOpen(root.notificationConversation,
-          service.lastChatKey)
-        formatToolbarEnabled: root.formatToolbarEnabled
-        onFormatToolbarToggled: function(enabled) { root.formatToolbarToggled(enabled) }
-      }
-    }
-  }
-
   Instantiator {
     id: pinWindows
     model: root.isSurfaceOwner && root.floatRulesReady ? root.openCards : null
     delegate: FloatingWindow {
       id: pinWin
+      property bool detailsOpen: false
+      property string verificationRequest: ""
+      property bool verificationExpired: false
+      onVerificationRequestChanged: {
+        verificationExpired = false
+        verificationTimeout.restart()
+      }
+      Timer {
+        id: verificationTimeout
+        interval: 8000
+        onTriggered: pinWin.verificationExpired = true
+      }
+      readonly property string verificationCode: verificationRequest !== "" && root.service &&
+        root.service.safetyRequest === verificationRequest &&
+        root.service.safetyConv === pinWin.conversation &&
+        root.service.selectedDirectKey === pinWin.directKey &&
+        root.service.directBindingMatches(pinWin.conversation, pinWin.directKey)
+        ? root.service.safetyCode : ""
+      onDetailsOpenChanged: if (!detailsOpen) verificationRequest = ""
+      readonly property bool conversationReadActive: pinPage.readActive
       required property string conversation
       required property string directKey
       required property string monitor
@@ -1537,13 +1602,17 @@ Item {
       }
 
       function applyRequestedFocus() {
-        if (!placement.settled || pinWin.placeOnMap || !pinWin.modelData ||
-            String(pinWin.modelData.conversation) !== root.focusConversation)
-          return
-        Qt.callLater(function() {
-          if (pinWin.visible && placement.settled && !pinWin.placeOnMap)
+        requestedFocusTimer.restart()
+      }
+      Timer {
+        id: requestedFocusTimer
+        interval: 0
+        onTriggered: {
+          if (pinWin.visible && placement.settled && !pinWin.placeOnMap &&
+              pinWin.modelData &&
+              String(pinWin.modelData.conversation) === root.focusConversation)
             root.focusHarborWindow(pinWin, pinWin.title)
-        })
+        }
       }
 
       function completeRequestedFocus(moved) {
@@ -1716,7 +1785,7 @@ Item {
       onPlaceOnMapChanged: {
         if (!pinWin.placeOnMap) {
           placement.settleWithoutPlacement()
-          Qt.callLater(pinWin.applyRequestedFocus)
+          pinWin.applyRequestedFocus()
         }
       }
       onSurfaceWidthChanged: pinWin.syncDesiredWidth()
@@ -1830,6 +1899,23 @@ Item {
             }
           }
           SurfaceBtn {
+            text: "Details"
+            selected: pinWin.detailsOpen
+            helpText: "Conversation settings"
+            onClicked: pinWin.detailsOpen = !pinWin.detailsOpen
+          }
+          SurfaceBtn {
+            text: "Close"
+            helpText: "Close chat"
+            onClicked: pinWin.closeWindow()
+          }
+        }
+
+        RowLayout {
+          visible: pinWin.detailsOpen
+          Layout.fillWidth: true
+          Layout.preferredHeight: visible ? implicitHeight : 0
+          SurfaceBtn {
             text: "Pop up: " + (pinPage.autoOpenEnabled ? "On" : "Off")
             helpText: pinPage.autoOpenEnabled
               ? "Pop up for new messages: on" : "Pop up for new messages: off"
@@ -1842,10 +1928,29 @@ Item {
             onClicked: root.toggleMute()
           }
           SurfaceBtn {
-            text: "Close"
-            helpText: "Close chat"
-            onClicked: pinWin.closeWindow()
+            visible: pinWin.conversation.charAt(0) !== "g"
+            text: "Verify"
+            helpText: "Compare this contact’s safety code"
+            onClicked: {
+              if (root.service.directBindingMatches(pinWin.conversation, pinWin.directKey) &&
+                  root.service.selectDirect(pinWin.conversation) &&
+                  root.service.getSafety(pinWin.conversation))
+                pinWin.verificationRequest = root.service.safetyRequest
+            }
           }
+          Item { Layout.fillWidth: true }
+        }
+        SafeText {
+          visible: pinWin.detailsOpen && pinWin.verificationRequest !== ""
+          Layout.fillWidth: true
+          text: pinWin.verificationCode !== ""
+            ? "Compare this code with your friend:\n" + pinWin.verificationCode
+            : pinWin.verificationExpired || root.service.safetyRequest !== pinWin.verificationRequest
+              ? "Select Verify to request this contact’s code again."
+              : "Requesting safety code…"
+          color: root.theme().fg || Color.foreground
+          font.family: Style.font.family; font.pixelSize: Style.font.body
+          wrapMode: Text.WrapAnywhere
         }
 
         Pages.ChatPage {

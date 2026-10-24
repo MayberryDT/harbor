@@ -18,14 +18,14 @@ import threading
 ROOT = Path(__file__).resolve().parents[1]
 QML_POLICY_SHA256 = {
     "CallTone.qml": "12d873ec1b774ed038fb526b0b2b7fd2a1a71e97d9987aa27fef06f6f4d93ddc",
-    "ChatSurface.qml": "44d7e94d20a4a771705d37c8efbdb36c26bb90f3b3500b3aec8e370f20b78fb6",
+    "ChatSurface.qml": "c734a0a9dd56d75a486903bec588cb5627e412519d584fe920159fed826fa00d",
     "MaterialSymbols.qml": "61ba207e579acabc5c5a842d9c8cd39bf8773f3b4b617951f09c4d373adb9629",
-    "Panel.qml": "63710d683f6ca463dc3d953f38ecc94c1403b9f3df81cf3fb02764a32c768c35",
+    "Panel.qml": "a7117f59d68d5148b1f12f3caa118da685f6b3d5da583a001845eba4a0a467c7",
     "PlacementController.qml": "87b297b7d63b939812d4f1a436b98e494446a618b6950c43d590c84562fae71f",
     "SafeText.qml": "a8bfa2ea5e13cbd50bf7e9c70995bea06ceeaca9c9d61e63b243ce18a830e354",
-    "Service.qml": "bb9d37d43b99a2bfcae751415079df28c317fa34d0f507d4fd0de927cac19da6",
+    "Service.qml": "63f044db9448370b495fa398e0d0406d77dd6b4cefd4afac7e700e527d124537",
     "SurfaceCoordinator.qml": "c206242de180c0b3a02b5ac50af9ba7e2486be1b0f585ed6ab8983979b0666f0",
-    "pages/ChatPage.qml": "1dd498a0b14e2aa4f1f47e431a2b86f58c73bd1e3f1e646cf262563386be51d4",
+    "pages/ChatPage.qml": "f1e4b390dca5f52bf7ef685d146f252c0c5179de58f0bb3005932ab49933526a",
 }
 TEXT_KINDS = (
     "Controls.TextArea",
@@ -129,7 +129,7 @@ COMPUTED_WRITE_ALLOWLIST = {
     "ChatSurface.qml": {"next", "pending"},
     "Panel.qml": {"entry", "found", "parts"},
     "Service.qml": {
-        "actors", "authoritativeNext", "bound", "command", "failedClearNext",
+        "actors", "deviceSeen", "authoritativeNext", "bound", "command", "failedClearNext",
         "failedHistoryKeys", "failedHistoryPending", "failedHistoryRequests",
         "failedRequests", "failedTransferIds", "groupBuild", "groupTypingNext",
         "historyKeyNext", "historyPendingNext", "historyRequestNext", "keyNext",
@@ -146,10 +146,10 @@ COMPUTED_WRITE_ALLOWLIST = {
 REVIEWED_COMPUTED_IDS = set().union(*COMPUTED_WRITE_ALLOWLIST.values())
 COMPUTED_WRITE_SOURCE_SHA256 = {
     "CallTone.qml": "8d9a0af95e58b888dfd09e37c198684843aa10d306f815abc868b88c61496c86",
-    "ChatSurface.qml": "72b1ad04de06bf4e0752f2bb47a7b36cdedcdeccc2e6f645daf9c911de5134ac",
-    "Panel.qml": "8c15dae1073d6941990380539b29aca2c7871ddc37ff2be5bc32f52e973d06be",
-    "Service.qml": "644497aa6de0b05ed93d3d84202a8ba77c4cd044632c99f1ec8e151c629f3040",
-    "pages/ChatPage.qml": "b559f7afa5864eb885d79aaf6fd1f96fd1f9516b761bdd25f877681c674b6316",
+    "ChatSurface.qml": "5ac3275f2254bd57b2c451caf7cc458d229dc114998a1a9dc8ee64a74f8c0b6c",
+    "Panel.qml": "6bcc43be961bcd35a05e7e9113a440bb2cfd3fe25af94825ffd1fd40a09a9bb1",
+    "Service.qml": "8b89163f0ff34c214e8f300fa0fd9219d0a37bf8d9f0260c0bccb75434ecc6b0",
+    "pages/ChatPage.qml": "cd68b861fd23e160dec697842737c353a14c5022637fcfb4e213b10d3cfd0d6e",
 }
 REVIEWED_MODEL_MUTATION_IDS = {
     "pages/ChatPage.qml": {"groupReceiptModel"},
@@ -179,21 +179,21 @@ OBJECT_ALIAS = re.compile(
 )
 PLAIN_INPUT_SHADOW = re.compile(
     r"\b(?:var|let|const|property\s+(?:var|string|url|int|real|bool))\s+"
-    r"(?P<id>chatSearchField|filePath|groupNameField|importPath|input|nicknameField|passField|unlockField)\b"
+    r"(?P<id>chatSearchField|groupNameField|importPath|input|nicknameField|passField|unlockField)\b"
 )
 PLAIN_INPUT_PARAMETER = re.compile(
     r"(?:\bfunction(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*|\bcatch\s*)\([^)]*"
-    r"\b(?P<id>chatSearchField|filePath|groupNameField|importPath|input|nicknameField|passField|unlockField)\b"
+    r"\b(?P<id>chatSearchField|groupNameField|importPath|input|nicknameField|passField|unlockField)\b"
 )
 PLAIN_INPUT_ARROW_PARAMETER = re.compile(
-    r"(?:\([^)]*\b|\b)(?P<id>chatSearchField|filePath|groupNameField|importPath|input|nicknameField|passField|unlockField)"
+    r"(?:\([^)]*\b|\b)(?P<id>chatSearchField|groupNameField|importPath|input|nicknameField|passField|unlockField)"
     r"\b[^=\n]*=>"
 )
 PLAIN_INPUT_OBJECT = re.compile(
     r"^(?P<indent>\s*)(?P<kind>TextField|TokenTextField|Controls\.TextArea)\s*\{\s*$"
 )
 PLAIN_INPUT_IDS = {
-    "chatSearchField", "filePath", "groupNameField", "importPath", "input", "nicknameField",
+    "chatSearchField", "groupNameField", "importPath", "input", "nicknameField",
     "passField", "unlockField",
 }
 EXPECTED_PLAIN = {
@@ -723,8 +723,7 @@ class ProbeHandler(BaseHTTPRequestHandler):
     hits: list[str] = []
     lock = threading.Lock()
     png = bytes.fromhex(
-        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
-        "0000000d49444154789c6360000000020001e221bc330000000049454e44ae426082"
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c6360000200000500017a5eab3f0000000049454e44ae426082"
     )
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API

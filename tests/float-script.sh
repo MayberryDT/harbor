@@ -35,7 +35,7 @@ if [ "$1" = "keyword" ] && [ -n "${OMAQ_FLOAT_FAIL_MARKER:-}" ]; then
   count=$(cat "$OMAQ_FLOAT_FAIL_MARKER" 2>/dev/null || printf '0')
   count=$((count + 1))
   printf '%s\n' "$count" >"$OMAQ_FLOAT_FAIL_MARKER"
-  [ "$count" -eq 5 ] && exit 1
+  [ "$count" -eq 6 ] && exit 1
 fi
 if [ "$1" = "eval" ]; then
   [ "${OMAQ_FLOAT_LUA:-0}" = "1" ] && exit 0
@@ -135,14 +135,14 @@ first_pid=$!
 second_pid=$!
 wait "$first_pid"
 wait "$second_pid"
-[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 4 ] || {
+[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 5 ] || {
   echo "float-script: duplicate classic rules" >&2
   exit 1
 }
 sleep 0.01
 touch "$HOME/.config/hypr/hyprland.conf"
 "$root/scripts/float-omaq.sh"
-[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 8 ] || {
+[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 10 ] || {
   echo "float-script: changed config did not refresh rules" >&2
   exit 1
 }
@@ -150,7 +150,7 @@ export HYPRLAND_INSTANCE_SIGNATURE="second-instance"
 "$root/scripts/float-omaq.sh"
 export HYPRLAND_INSTANCE_SIGNATURE="test-instance"
 "$root/scripts/float-omaq.sh"
-[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 12 ] || {
+[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 15 ] || {
   echo "float-script: instance-scoped rule marker failed" >&2
   exit 1
 }
@@ -390,12 +390,12 @@ unset OMAQ_FLOAT_FAIL_MARKER
 kill "$socket_pid" 2>/dev/null || true
 wait "$socket_pid" 2>/dev/null || true
 socket_pid=""
-[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 17 ] || {
+[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 21 ] || {
   echo "float-script: leader, follower, and failed reload counts differ" >&2
   exit 1
 }
 "$root/scripts/float-omaq.sh" watch-rules
-[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 25 ] || {
+[ "$(grep -c '^keyword windowrulev2' "$OMAQ_FLOAT_TEST_LOG")" -eq 31 ] || {
   echo "float-script: later watcher did not take over after leader exit" >&2
   exit 1
 }
@@ -407,7 +407,7 @@ if grep -q 'dispatch hl.dsp$' "$OMAQ_FLOAT_TEST_LOG"; then
   echo "float-script: invalid Lua capability probe returned" >&2
   exit 1
 fi
-grep -q 'harbor_window_rules.chat_v6 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG" || {
+grep -q 'harbor_window_rules.chat_v7 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG" || {
   echo "float-script: Lua rule handle is not retained" >&2
   exit 1
 }
@@ -423,7 +423,7 @@ grep -q 'harbor_window_rules.demo_v4.*no_anim = true' "$OMAQ_FLOAT_TEST_LOG" || 
   echo "float-script: demo window animation unexpectedly changed" >&2
   exit 1
 }
-chat_rule=$(grep 'harbor_window_rules.chat_v6 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG")
+chat_rule=$(grep 'harbor_window_rules.chat_v7 = hl.window_rule' "$OMAQ_FLOAT_TEST_LOG")
 if printf '%s\n' "$chat_rule" | grep -q 'no_anim'; then
   echo "float-script: Lua chat animation remains disabled" >&2
   exit 1

@@ -160,7 +160,7 @@ case "$*" in
     printf '[{"id":"io.zet.harbor","enabled":%s,"firstParty":false,"kinds":["bar-widget"]}]\n' \
       "${OMAQ_PLUGIN_ENABLED:-false}"
     ;;
-  "pkg add toxcore libsignal-protocol-c libpulse libpng libjpeg-turbo libwebp ttf-material-symbols-variable qrencode")
+  "pkg add toxcore libsignal-protocol-c sqlite libpulse libpng libjpeg-turbo libwebp ttf-material-symbols-variable qrencode")
     printf 'packages\n' >>"$OMAQ_INSTALL_TEST_LOG"
     exit "${OMAQ_PACKAGE_STATUS:-0}"
     ;;
@@ -345,7 +345,7 @@ esac
 EOF
 cat >"$wrapper/bin/omarchy" <<'EOF'
 #!/bin/sh
-[ "$*" = "pkg add toxcore libsignal-protocol-c libpulse libpng libjpeg-turbo libwebp ttf-material-symbols-variable qrencode" ] || exit 96
+[ "$*" = "pkg add toxcore libsignal-protocol-c sqlite libpulse libpng libjpeg-turbo libwebp ttf-material-symbols-variable qrencode" ] || exit 96
 printf 'packages\n' >>"$OMAQ_INSTALL_TEST_LOG"
 exit "${OMAQ_PACKAGE_STATUS:-0}"
 EOF
@@ -400,6 +400,7 @@ printf '%s\n' "$*" >>"$OMAQ_UPDATE_TEST_LOG"
 exit "${OMAQ_UPDATE_STATUS:-0}"
 EOF
 chmod 755 "$tmp/home/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh"
+cp "$root/scripts/update-harbor.sh" "$tmp/home/.config/omarchy/plugins/io.zet.harbor/scripts/update-harbor.sh"
 run_update_case() {
   name=$1
   status=$2

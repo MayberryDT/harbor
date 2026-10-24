@@ -1,24 +1,26 @@
 # Harbor fork status
 
-Image preview fix (24 October 2026, not deployed): image clicks now open a
+Image preview fix (published and installed in Harbor 1.3.1, 24 October 2026): image clicks now open a
 conversation-local preview with Zoom in/Fit, scrolling, Close and Escape.
 This avoids the reproduced imv-wayland crash without changing the default
 viewer. Missing files show a readable error; drafts survive dismissal and
 contact changes dismiss the preview. See [verification](stages/image-preview.md).
 
-Nickname draft fix (24 October 2026, not deployed): clicking Save while the
+Nickname draft fix (published and installed in Harbor 1.3.1, 24 October 2026): clicking Save while the
 helper was unavailable fell through the disabled button to the panel's dismiss
 handler and erased the draft. The header now absorbs those clicks, active edits
 survive profile refreshes, and valid submissions show helper-readiness feedback
 in the lower frame. See [verification and remaining limits](stages/nickname-draft.md).
 
+The [living implementation plan](IMPLEMENTATION_PLAN.md) owns expanded product scope, authority and next action. Harbor 1.3.1 is the released baseline. Harbor 2 is an uncommitted implementation under test; [its acceptance ledger](stages/harbor2.md) records completed slices and remaining scope. Multi-device backend checks do not imply the complete native experience has shipped.
+
 Harbor expands text to 64 KiB, files to 1 GiB and inline images to 64 MiB;
 see [Harbor implementation and evidence](HARBOR.md). The following retained
 upstream status describes the starting point; its historical limits are superseded.
 
-# Current status: 2026-10-14
+# Retained upstream snapshot: 2026-10-14
 
-This page is the current product and release snapshot. Completed phase and follow-up history lives in the [stage notes](stages/README.md).
+The remainder is historical baseline context, not the current release manifest. Completed phase and follow-up history lives in the [stage notes](stages/README.md).
 
 ## Snapshot
 
@@ -119,3 +121,10 @@ No current test claims complete native Wayland or multi-monitor acceptance.
 1. Complete the remaining native three-identity invite-conflict, three-peer group/attachment, separate-network, and display checks.
 2. Prepare any new tag or release only after separate target acceptance and release approval.
 3. Keep packaging and AUR publication paused until separately approved.
+
+## Usability patch prepared — 24 October 2026
+
+File-request popup/sound routing, invitation alerts, a built-in file chooser, and
+a panel without GitHub/Ko-fi controls are prepared and natively checked. See
+[everyday usability](stages/friction.md) for evidence and remaining identity,
+contact and transfer work. This patch is not yet committed or live.

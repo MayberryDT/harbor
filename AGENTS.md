@@ -1,6 +1,25 @@
 # Repository Guidelines
 
-These rules apply to OmaQ and are the default context for future work. Follow a direct maintainer instruction when it conflicts with this file. Communicate with the maintainer in German unless another language is requested. Keep source code, UI copy, comments, and public documentation in English.
+These rules govern Harbor, forked from OmaQ. Follow direct maintainer instructions when they conflict. Communicate with Tyler in English; keep source, UI copy, comments and public documentation in English.
+
+## Harbor project direction
+
+Harbor 2 implementation is authorized by Tyler (24 October 2026).
+`docs/REDESIGN.md` supersedes the inherited action-rail layout and routine
+confirmation requirements where it explicitly defines a new journey. The home
+panel is conversation-first, Add and Settings replace the rail, files use native
+Qt dialogs and attachment cards, and explicit one-use bearer invites are
+helper-owned. Existing invites retain their original consent policy. Preserve
+cryptographic, stable-key, persistence and scoped destructive-action boundaries.
+New downloads use `Downloads/Harbor`; saved historical paths remain unchanged.
+`HARBOR_HOME`, `HARBOR_STATE`, and `HARBOR_DOWNLOAD_DIR` take precedence,
+with legacy aliases retained. Internal legacy state/runtime names remain a
+compatibility boundary until a separately verified migration.
+See `docs/stages/harbor2.md` for current acceptance evidence and unfinished work.
+
+Start expanded product work at [the living plan](docs/IMPLEMENTATION_PLAN.md). [The specification](docs/SPECIFICATION.md) owns agreed outcomes; [development](docs/DEVELOPMENT.md) owns environment and verification. Read root [juice.md](juice.md) before experience work and update relevant discoveries/stale direction as work changes. [COPYWRITING.md](COPYWRITING.md) owns audience and voice. Preparation does not authorize live activation.
+
+The inherited product and protocol rules below describe the current baseline. The next product adds authenticated multi-device identity and an optional self-hosted encrypted mailbox; the old no-backend rule does not prohibit that agreed optional service. Keep it optional and unable to decrypt contents. Never implement simultaneous devices by copying live Tox or Ratchet state. Build and test on Halla; preserve the existing source checkout and staged work.
 
 ## Product intent
 
@@ -54,7 +73,7 @@ Reuse existing `qs.Ui`, `qs.Commons`, `Style`, `BorderSurface`, `Button`, `Panel
 - In the Demo window, `Mute` is immediately left of `Close`.
 - In the bar panel, the global `Mute` action is below the `Demo` action. It must show its current `Mute`/`Unmute` state.
 - The panel's compact fixed header normally shows the self avatar, nickname, and `YOU · <STATE>`. A pending contact or group request replaces that entire self presentation with a clearly labelled invitation title, concise context, and prominent accept/decline controls; self content returns only after the request is no longer pending. Its height matches the former compact panel header and it has no redundant Close action; Escape, the OmaQ bar action, and click-away remain the panel dismissal paths. The Friends/Groups list starts at the top of the lower-left frame without reserving the former self-profile space.
-- A separate compact fixed support frame above the right icon rail contains the supplied HANCORE terminal-chat image linked to the OmaQ GitHub repository and a monochrome Ko-fi glyph linked to `https://ko-fi.com/hancore`. Both assets use transparent backgrounds, have no per-icon button border in any state, change to `color03` on hover or keyboard focus, and use the same 30-pixel cells, glyph scale, and zero column gap as the two-column action rail below.
+- The compact profile/request header spans the panel width. Do not show GitHub or donation/support links in the chat panel. The action rail and lower-left menu keep their own widths below it.
 - When the primary Friends/Groups frame is visible, its bottom border aligns exactly with the bottom border of the right icon rail; either frame may increase the shared base height.
 - The panel card is a literal 400 QML pixels wide. Friend columns derive from the inner grid width rather than contact count; the standard font bases use one column, and more than five contacts remain reachable through the existing bounded vertical scroll.
 - Opening a rail menu keeps the fixed header, support frame, and right icon rail at their original positions. Every rail selection, confirmation, and submenu remains inside the thin lower-left frame. The panel extends only enough to show the active menu without scrolling when it fits on screen; only the lower-left content may scroll when the available screen height is insufficient.
@@ -81,7 +100,7 @@ Reuse existing `qs.Ui`, `qs.Commons`, `Style`, `BorderSurface`, `Button`, `Panel
 - DirectChat and GroupChat message text supports pointer and keyboard selection. While a non-empty selection exists, show a compact `content_copy` action that copies exactly the selected text. Hide that action when no text is selected.
 - A received file path is clickable. Its menu offers `Open containing folder` and `Copy full path`; use the actual stored path, not a guessed state path.
 - Copy/cut/paste/select actions must provide visible feedback where applicable and retain keyboard accessibility. Text paste remains available while the helper reconnects or lacks group-attachment capability; only a confirmed image MIME takes the helper-owned staging path. Bind each unadopted attachment stage to its IPC client and discard it when that client disconnects.
-- The file chooser row closes after starting a send and when an incoming or completed transfer is handled. The file icon can reopen it.
+- The paperclip and Ctrl+O open the built-in Qt file dialog directly, without requiring an external picker program. Cancellation leaves the next open one click away. Validate the selected local URL against the captured conversation/contact. The file chooser row closes after starting a send and when an incoming or completed transfer is handled.
 
 ## Panel and notification UX
 

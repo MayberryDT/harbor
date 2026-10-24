@@ -1,5 +1,7 @@
 # Harbor documentation
 
+For expanded Harbor development, start at [the living plan](IMPLEMENTATION_PLAN.md), [specification](SPECIFICATION.md), and [development setup](DEVELOPMENT.md). Read [juice.md](../juice.md) for experience changes and retain useful scoped findings there.
+
 ## User documentation
 
 - [Illustrated user guide](USER-GUIDE.md): invitations, chats, files, calls, groups, the terminal client, identity protection, and recovery

@@ -30,6 +30,10 @@ void omaq_ratchet_release_peer_cache(struct omaq_ratchet *r, const char *peer);
 int omaq_ratchet_reset_session(struct omaq_ratchet *r, const char *peer);
 int omaq_ratchet_encrypt(struct omaq_ratchet *r, const char *peer,
 			 const char *plain, char *out, size_t n);
+typedef int (*omaq_ratchet_plaintext_commit)(void *context, const unsigned char *plain, size_t length);
+int omaq_ratchet_decrypt_durable(struct omaq_ratchet *r, const char *peer,
+    const char *wire, char *out, size_t n, size_t *out_length,
+    omaq_ratchet_plaintext_commit commit, void *context);
 int omaq_ratchet_decrypt(struct omaq_ratchet *r, const char *peer,
 			 const char *wire, char *out, size_t n,
 			 size_t *out_length);

@@ -227,7 +227,13 @@ while [ "$i" -lt 100 ]; do
 done
 [ "$i" -lt 100 ] || { echo "reinvite-recovery: matching bundle did not repair missing identity" >&2; exit 1; }
 printf '%s\n' '{"op":"status","id":"identity-after-guard-test"}' >&3
-sleep 0.2
+i=0
+while [ "$i" -lt 100 ]; do
+    grep -a '"event":"snapshot"' "$base/missing.out" | grep -a -q '"request":"identity-after-guard-test"' && break
+    i=$((i + 1))
+    sleep 0.05
+done
+[ "$i" -lt 100 ] || { echo "reinvite-recovery: restored identity snapshot missing" >&2; exit 1; }
 identity_after=$(grep -a '"event":"snapshot"' "$base/missing.out" |
 	grep -a '"request":"identity-after-guard-test"' | tail -1 |
 	sed -n 's/.*"addr":"\([^"]*\)".*/\1/p')

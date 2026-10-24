@@ -39,11 +39,18 @@ exec 4>"$holdb"
 sleep 0.4
 
 echo '{"op":"status"}' >&3
-sleep 0.2
+i=0
+while ! grep -a -q '"addr"' "$fa" && [ "$i" -lt 100 ]; do
+    i=$((i + 1))
+    sleep 0.1
+done
 grep -a -q '"addr"' "$fa" || { echo "phase8: no tox" >&2; exit 1; }
 
 echo '{"op":"invite.create","ttlSec":86400,"kind":"direct"}' >&3
-sleep 0.3
+i=0
+while ! grep -a -q '"event":"invite","url"' "$fa" && [ "$i" -lt 100 ]; do
+    i=$((i + 1)); sleep 0.1
+done
 url=$(grep -a '"url"' "$fa" | tail -1 | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
 [ -n "$url" ] || { echo "phase8: no url" >&2; exit 1; }
 echo "$url" | grep -q 'rk=' || { echo "phase8: invite missing rk" >&2; echo "$url" >&2; exit 1; }
@@ -52,7 +59,7 @@ printf '{"op":"invite.redeem","payload":"%s"}\n' "$url" >&4
 ok=0
 i=0
 while [ "$i" -lt 90 ]; do
-	if grep -a -q '"request"' "$fa"; then
+	if grep -a -q '"event":"request","kind":"direct"' "$fa"; then
 		ok=1
 		break
 	fi

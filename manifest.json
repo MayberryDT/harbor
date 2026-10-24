@@ -5,7 +5,7 @@
   "version": "1.3.1",
   "author": "MayberryDT; based on OmaQ by hancore",
   "license": "MIT AND GPL-3.0-only AND CC-BY-SA-4.0 AND CC0-1.0 AND OFL-1.1-no-RFN AND LicenseRef-Pixabay-Content",
-  "description": "Invite-only chat with room for long messages and larger cargo.",
+  "description": "Private conversations with your people, at home on Omarchy.",
   "kinds": [
     "bar-widget"
   ],
@@ -20,8 +20,7 @@
     "defaultSection": "right",
     "defaults": {
       "notifyBadge": true,
-      "notifyRightPanel": false,
-      "notifyDesktop": false,
+      "notifyDesktop": true,
       "surfaceMode": "separate",
       "sound": "knock",
       "soundCustomPath": "",
@@ -29,7 +28,8 @@
       "chatTheme": "system",
       "messageScale": 1.0,
       "animateUnread": true,
-      "formatToolbar": false
+      "formatToolbar": false,
+      "notificationMuted": false
     },
     "schema": [
       {
@@ -39,16 +39,10 @@
         "defaultValue": true
       },
       {
-        "key": "notifyRightPanel",
-        "type": "boolean",
-        "label": "Right panel",
-        "defaultValue": false
-      },
-      {
         "key": "notifyDesktop",
         "type": "boolean",
-        "label": "Desktop notification",
-        "defaultValue": false
+        "label": "Desktop notification fallback",
+        "defaultValue": true
       },
       {
         "key": "surfaceMode",
@@ -126,6 +120,12 @@
         "key": "formatToolbar",
         "type": "boolean",
         "label": "Formatting toolbar",
+        "defaultValue": false
+      },
+      {
+        "key": "notificationMuted",
+        "type": "boolean",
+        "label": "Mute notification sound",
         "defaultValue": false
       }
     ]

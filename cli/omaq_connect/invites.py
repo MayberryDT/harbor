@@ -65,8 +65,8 @@ class Invites:
 
     def redeem(self, arg):
         link = arg.strip()
-        if not link.startswith("omaq://"):
-            self.say("Paste the omaq:// link after :redeem")
+        if not link.startswith(("harbor://", "omaq://")):
+            self.say("Paste the Harbor invite link after :redeem")
         elif len(link.encode("utf-8")) > PATH_MAX:
             self.say("Link is too long")
         else:

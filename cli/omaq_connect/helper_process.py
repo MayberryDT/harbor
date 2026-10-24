@@ -14,7 +14,8 @@ def default_state():
 
 
 def omaq_paths():
-    return os.environ.get("OMAQ_HOME") or default_home(), os.environ.get("OMAQ_STATE") or default_state()
+    return (os.environ.get("HARBOR_HOME") or os.environ.get("OMAQ_HOME") or default_home(),
+            os.environ.get("HARBOR_STATE") or os.environ.get("OMAQ_STATE") or default_state())
 
 
 def helper_binary():
@@ -69,7 +70,8 @@ class HelperProcess:
                 self.say(problem, 60)
                 return
         self.nonce = secrets.token_hex(16)
-        env = dict(os.environ, OMAQ_HOME=home, OMAQ_STATE=state, OMAQ_PROTOCOL_NONCE=self.nonce)
+        env = dict(os.environ, HARBOR_HOME=home, HARBOR_STATE=state,
+                   OMAQ_HOME=home, OMAQ_STATE=state, OMAQ_PROTOCOL_NONCE=self.nonce)
         log_fd, self.log_path = self.presence.log()
         try:
             self.proc = subprocess.Popen([binary], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

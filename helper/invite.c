@@ -257,9 +257,12 @@ int omaq_invite_parse(const char *url, omaq_invite *out)
 		return -1;
 	url = trimmed;
 
-	if (strncmp(url, "omaq://invite/", 14) != 0)
+	if (strncmp(url, "harbor://invite/", 16) == 0)
+		p = url + 16;
+	else if (strncmp(url, "omaq://invite/", 14) == 0)
+		p = url + 14;
+	else
 		return -1;
-	p = url + 14;
 	if (strlen(p) < OMAQ_TOX_ADDR_LEN)
 		return -1;
 	for (int i = 0; i < OMAQ_TOX_ADDR_LEN; i++) {
@@ -416,4 +419,17 @@ bool omaq_invite_expired(const omaq_invite *inv, int64_t now)
 	if (!inv)
 		return true;
 	return now >= inv->expiry;
+}
+
+int omaq_invite_normalize(const char *url, char *buf, size_t buflen)
+{
+    omaq_invite inv;
+    char canonical[OMAQ_URL_MAX];
+    if (!url || !buf || !buflen || omaq_invite_parse(url, &inv) ||
+        omaq_invite_format(&inv, canonical, sizeof(canonical))) return -1;
+    url += strspn(url, " \t\r\n\v\f");
+    int written = strncmp(url, "harbor://", 9) == 0
+        ? snprintf(buf, buflen, "harbor://%s", canonical + 7)
+        : snprintf(buf, buflen, "%s", canonical);
+    return written < 0 || (size_t)written >= buflen ? -1 : 0;
 }

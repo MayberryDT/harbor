@@ -90,7 +90,7 @@ helper_runtime="$root/scripts/helper-runtime.py"
 
 install_packages() {
   PATH=/usr/bin:/bin /usr/bin/omarchy pkg add \
-    toxcore libsignal-protocol-c libpulse libpng libjpeg-turbo libwebp \
+    toxcore libsignal-protocol-c sqlite libpulse libpng libjpeg-turbo libwebp \
     ttf-material-symbols-variable qrencode
 }
 

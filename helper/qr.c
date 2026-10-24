@@ -28,18 +28,17 @@ int omaq_qr_path_ok(const char *path)
 
 int omaq_qr_write_png(const char *url, const char *path)
 {
-	omaq_invite inv;
-	char canonical[OMAQ_URL_MAX];
+	char canonical[OMAQ_URL_MAX + 2];
 	const char *bin;
 	pid_t pid;
 	int st;
 
-	if (!url || omaq_invite_parse(url, &inv) != 0 ||
-	    omaq_invite_format(&inv, canonical, sizeof(canonical)) != 0)
-		return -1;
+	if (omaq_invite_normalize(url, canonical, sizeof(canonical)))
+        return -1;
 	if (omaq_qr_path_ok(path) != 0)
 		return -1;
-	bin = getenv("OMAQ_QRENCODE");
+	bin = getenv("HARBOR_QRENCODE");
+    if (!bin || !bin[0]) bin = getenv("OMAQ_QRENCODE");
 	if (!bin || !bin[0])
 		bin = "/usr/bin/qrencode";
 	pid = fork();

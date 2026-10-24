@@ -271,7 +271,7 @@ omarchy plugin validate ~/.config/omarchy/plugins/io.zet.harbor
 The supported updater keeps every source fetch and helper build outside the monitored plugin directory. Run it from an installation that already contains the command:
 
 ```bash
-~/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh --yes
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-harbor.sh --yes
 ```
 
 Do not run `omarchy plugin update io.zet.harbor --yes` or include Harbor in an all-plugins `omarchy plugin update --yes` operation. Omarchy's generic updater fast-forwards the source checkout but has no Harbor lifecycle hook to rebuild and verify the native helper. Use only the Harbor updater above.
@@ -331,7 +331,7 @@ A staged build or pre-exchange check leaves the live tree unchanged. A post-exch
 The final activation check can fail after the new tree passed its pre-activation consumer checks. The updater leaves that tree in place because the helper process may already have changed, returns a failure, and never treats an inactive helper as success. Check helper status first. Restore `.prev` if the hashes differ or the error reports an inactive, substituted, protocol-incompatible, or degraded helper:
 
 ```bash
-~/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh \
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-harbor.sh \
   --rollback-helper --yes
 ```
 
@@ -353,7 +353,7 @@ A group-free restart creates a short offline window. In-flight messages become `
 Run the verified wrapper:
 
 ```bash
-~/.config/omarchy/plugins/io.zet.harbor/scripts/uninstall-omaq.sh
+~/.config/omarchy/plugins/io.zet.harbor/scripts/uninstall-harbor.sh
 ```
 
 When a helper is running, the wrapper binds it to its process, executable, socket, and instance. It removes the plugin only after a correlated group-free shutdown acknowledgment and never uses a signal fallback. When no helper runtime exists, it locks helper startup before removal instead.
@@ -381,7 +381,7 @@ After removing the plugin, an interactive wrapper run offers each existing Harbo
 - `~/.omaq-source-install/`: a retained legacy source checkout, when present
 - the exact Omarchy plugin backup path reported during removal, when present
 
-Absolute `OMAQ_HOME`, `OMAQ_STATE`, `OMAQ_DOWNLOAD_DIR`, `XDG_DOWNLOAD_DIR`, and `XDG_STATE_HOME` overrides are offered at their configured locations when their paths are canonical and owner-controlled.
+Absolute `HARBOR_HOME`, `HARBOR_STATE`, `HARBOR_DOWNLOAD_DIR`, `XDG_DOWNLOAD_DIR`, and `XDG_STATE_HOME` overrides (with the corresponding `OMAQ_*` names retained as compatibility aliases) are offered at their configured locations when their paths are canonical and owner-controlled.
 
 Every destructive answer defaults to No. A confirmed parent is retained when it contains another candidate that was declined or withheld as unsafe. Each remaining accepted directory is renamed within its owner-controlled parent, fully checked for ownership, permissions, device and mount boundaries, and entry count, and only then passed to symlink-resistant recursive deletion. Top-level symlink candidates and unsafe trees are retained without deletion; nested symlinks are unlinked without following their targets. An unexpected deletion error reports that cleanup may be partial, identifies the parent where a hidden quarantine remainder may exist, and stops before processing another selected path. `uninstall-omaq.sh --yes` is non-interactive and retains every data directory.
 

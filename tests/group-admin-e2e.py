@@ -29,6 +29,9 @@ class Peer:
             path.mkdir(mode=0o700, exist_ok=True)
         env = os.environ.copy()
         env.update(
+            HARBOR_HOME=str(self.home),
+            HARBOR_STATE=str(self.state),
+            HARBOR_DOWNLOAD_DIR=str(self.download),
             OMAQ_HOME=str(self.home),
             OMAQ_STATE=str(self.state),
             OMAQ_DOWNLOAD_DIR=str(self.download),
@@ -70,7 +73,7 @@ class Peer:
         if self.process.poll() is not None:
             raise RuntimeError(f"{self.name}: helper exited {self.process.returncode}")
         assert self.process.stdin is not None
-        self.process.stdin.write(json.dumps(operation, separators=(",", ":")) + "\n")
+        self.process.stdin.write(json.dumps(operation, ensure_ascii=False, separators=(",", ":")) + "\n")
         self.process.stdin.flush()
 
     def mark(self) -> int:
@@ -105,7 +108,9 @@ class Peer:
             return
         self.process.send_signal(signal.SIGTERM)
         try:
-            self.process.wait(timeout=2)
+            # Let durable storage finish under concurrent native E2E I/O. A forced
+            # kill is a crash test, not the normal restart these journeys intend.
+            self.process.wait(timeout=15)
         except subprocess.TimeoutExpired:
             self.process.kill()
             self.process.wait(timeout=2)

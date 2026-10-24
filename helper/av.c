@@ -288,7 +288,7 @@ static void *audio_main(void *arg)
 	if (!mainloop)
 		failed = 1;
 	if (!failed)
-		context = pa_context_new(pa_mainloop_get_api(mainloop), "OmaQ");
+		context = pa_context_new(pa_mainloop_get_api(mainloop), "Harbor");
 	if (!context || pa_context_connect(context, NULL, PA_CONTEXT_NOFLAGS, NULL) != 0)
 		failed = 1;
 	pthread_mutex_lock(&g_audio_lock);

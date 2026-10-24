@@ -19,8 +19,8 @@ if "HyprlandFocusGrab {" not in header or "windows: [popup]" not in header or \
     raise SystemExit("input-mask: popup lost compositor click-away dismissal")
 if "!root.avatarRestorePending" not in header or \
         'root.identityPickerMode === ""' not in header or \
-        "!avatarPick.running && !identityPick.running" not in header:
-    raise SystemExit("input-mask: pending or active external pickers can be dismissed by the panel focus grab")
+        "!avatarPick.visible && !identityPick.visible" not in header:
+    raise SystemExit("input-mask: pending or active native pickers can be dismissed by the panel focus grab")
 if "onBackingWindowActiveChanged:" not in header:
     raise SystemExit("input-mask: popup lost non-grab focus dismissal")
 button_start = text.index("  BarIconButton {\n    id: button")

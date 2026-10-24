@@ -2197,9 +2197,25 @@ int omaq_ratchet_encrypt(struct omaq_ratchet *r, const char *peer,
 	return 0;
 }
 
+struct durable_decrypt {
+    omaq_ratchet_plaintext_commit commit;
+    void *context;
+};
+static int commit_decrypted(session_cipher *cipher, signal_buffer *plaintext, void *context)
+{
+    (void)cipher;
+    struct durable_decrypt *transaction = context;
+    return transaction->commit(transaction->context, signal_buffer_const_data(plaintext), signal_buffer_len(plaintext));
+}
 int omaq_ratchet_decrypt(struct omaq_ratchet *r, const char *peer,
+    const char *wire, char *out, size_t n, size_t *out_length)
+{
+    return omaq_ratchet_decrypt_durable(r,peer,wire,out,n,out_length,NULL,NULL);
+}
+
+int omaq_ratchet_decrypt_durable(struct omaq_ratchet *r, const char *peer,
 			 const char *wire, char *out, size_t n,
-			 size_t *out_length)
+			 size_t *out_length, omaq_ratchet_plaintext_commit commit, void *context)
 {
 	session_cipher *c = NULL;
 	signal_protocol_address addr;
@@ -2231,6 +2247,8 @@ int omaq_ratchet_decrypt(struct omaq_ratchet *r, const char *peer,
 		free(raw);
 		return -1;
 	}
+    struct durable_decrypt transaction = { commit, context };
+    if (commit) session_cipher_set_decryption_callback(c,commit_decrypted);
 	if (typ == CIPHERTEXT_PREKEY_TYPE) {
 		pre_key_signal_message *m = NULL;
 		if (pre_key_signal_message_deserialize(&m, raw, rawn, r->ctx) == 0) {
@@ -2240,7 +2258,7 @@ int omaq_ratchet_decrypt(struct omaq_ratchet *r, const char *peer,
 			struct prekey_reservation *consumed =
 				consumed_prekey_find(r, peer, prekey_id, 0);
 			if ((reservation || consumed) && session_cipher_decrypt_pre_key_signal_message(
-						c, m, NULL, &plain) == 0) {
+						c, m, commit ? &transaction : NULL, &plain) == 0) {
 				rc = 0;
 			} else if (!reservation && !consumed &&
 				   !prekey_reservation_find(r, NULL, prekey_id, 0) &&
@@ -2253,7 +2271,7 @@ int omaq_ratchet_decrypt(struct omaq_ratchet *r, const char *peer,
 	} else {
 		signal_message *m = NULL;
 		if (signal_message_deserialize(&m, raw, rawn, r->ctx) == 0 &&
-		    session_cipher_decrypt_signal_message(c, m, NULL, &plain) == 0)
+		    session_cipher_decrypt_signal_message(c, m, commit ? &transaction : NULL, &plain) == 0)
 			rc = 0;
 		if (m)
 			SIGNAL_UNREF(m);

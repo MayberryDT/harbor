@@ -107,6 +107,7 @@ start_call_bridge() {
 import socket
 import sys
 import time
+import threading
 
 client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 for _ in range(100):
@@ -117,6 +118,15 @@ for _ in range(100):
         time.sleep(0.05)
 else:
     raise SystemExit("phase6: call IPC socket unavailable")
+# A normal IPC adapter consumes events while writing commands. Otherwise this
+# long call journey eventually exercises slow-client eviction instead.
+def drain():
+    try:
+        while client.recv(65536):
+            pass
+    except OSError:
+        pass
+threading.Thread(target=drain, daemon=True).start()
 with open(sys.argv[2], "rb", buffering=0) as commands:
     while True:
         data = commands.read(4096)
@@ -197,7 +207,11 @@ sleep 0.4
 echo '{"op":"status"}' >&3
 echo '{"op":"status"}' >&4
 echo '{"op":"status"}' >&7
-sleep 0.2
+i=0
+while [ "$i" -lt 100 ]; do
+    if grep -a -q '"addr"' "$fa" && grep -a -q '"addr"' "$fb" && grep -a -q '"addr"' "$fc"; then break; fi
+    i=$((i + 1)); sleep 0.1
+done
 if ! grep -a -q '"addr"' "$fa" || ! grep -a -q '"addr"' "$fb" ||
    ! grep -a -q '"addr"' "$fc"; then
 	echo "phase6: no tox" >&2
@@ -216,7 +230,10 @@ public_key_c=$(grep -a '"addr"' "$fc" | tail -1 |
 }
 
 echo '{"op":"invite.create","ttlSec":86400,"kind":"direct"}' >&3
-sleep 0.3
+i=0
+while ! grep -a -q '"event":"invite","url":"harbor://' "$fa" && [ "$i" -lt 100 ]; do
+    i=$((i + 1)); sleep 0.1
+done
 url=$(grep -a '"url"' "$fa" | tail -1 | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
 [ -n "$url" ] || { echo "phase6: no invite url" >&2; exit 1; }
 
@@ -615,7 +632,7 @@ while [ "$i" -lt 40 ]; do
 done
 [ "$ok" -eq 1 ] || { echo "phase6: no file.done" >&2; tail -20 "$fb" >&2; exit 1; }
 
-got=$(find "$hb/Downloads/omaq" -type f 2>/dev/null | head -1)
+got=$(find "$hb/Downloads/Harbor" -type f 2>/dev/null | head -1)
 [ -n "$got" ] || { echo "phase6: no dest file" >&2; exit 1; }
 grep -a -q 'omaq-file-probe' "$got" || { echo "phase6: dest mismatch" >&2; exit 1; }
 python3 - "$fa" "$fb" "$ha/history/d:$friend_key_a/messages.jsonl" \

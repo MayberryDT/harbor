@@ -1121,7 +1121,7 @@ def main(argv: list[str] | None = None) -> int:
             installer.install()
         return 0
     except (core.UpdateError, OSError, ValueError) as error:
-        print(f"install-omaq: {error}", file=sys.stderr)
+        print(f"install-harbor: {error}", file=sys.stderr)
         return 1
     finally:
         if installer is not None:

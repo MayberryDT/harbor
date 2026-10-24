@@ -80,7 +80,7 @@ The [fork verification notes](docs/HARBOR.md) record the tested helper and repea
 Use the helper-aware updater so the interface and native helper stay together:
 
 ```bash
-~/.config/omarchy/plugins/io.zet.harbor/scripts/update-omaq.sh --yes
+~/.config/omarchy/plugins/io.zet.harbor/scripts/update-harbor.sh --yes
 ```
 
 Do not use `omarchy plugin update` for Harbor. See the [installation lifecycle](docs/INSTALLATION.md) for update and recovery details.
@@ -88,7 +88,7 @@ Do not use `omarchy plugin update` for Harbor. See the [installation lifecycle](
 To remove the plugin:
 
 ```bash
-~/.config/omarchy/plugins/io.zet.harbor/scripts/uninstall-omaq.sh
+~/.config/omarchy/plugins/io.zet.harbor/scripts/uninstall-harbor.sh
 ```
 
 The uninstaller asks separately before removing personal data. Keeping it is the default.

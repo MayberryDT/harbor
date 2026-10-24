@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs as Dialogs
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import QtMultimedia
@@ -13,6 +14,7 @@ import "../MessageLayout.js" as MessageLayout
 FocusScope {
   // Keep the live plugin parser cache tied to the current source revision.
   id: root
+  property string selectedFilePath: ""
   property var service: null
   property var theme: ({ bg: "", fg: "", accent: "", unread: "" })
   property real messageScale: 1.0
@@ -65,9 +67,6 @@ FocusScope {
   property string fileStatus: ""
   property string fileStatusPath: ""
   property string reactionStatus: ""
-  property bool filePickerClosing: false
-  property int filePickerExitCode: -1
-  property bool filePickerStreamDone: false
   property string pendingImagePath: ""
   property string pendingImageStageRequest: ""
   property string pendingImageSendRequest: ""
@@ -243,16 +242,6 @@ FocusScope {
   readonly property int smileTextPx: Style.font.body
   readonly property int messageTextPx: Math.max(Style.font.caption,
     Math.round(smileTextPx * messageScale))
-  readonly property string filePickerScript:
-    "if command -v zenity >/dev/null 2>&1; then\n" +
-    "  exec zenity --file-selection --title='Send file'\n" +
-    "elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "  exec kdialog --getopenfilename \"$HOME\" '*|All files'\n" +
-    "elif command -v yad >/dev/null 2>&1; then\n" +
-    "  exec yad --file --title='Send file'\n" +
-    "fi\n" +
-    "exit 2\n"
-
   readonly property var emojiSet: [
     "😀", "🙂", "😉", "😍", "😂", "😅", "🙌", "👍",
     "👎", "❤️", "🔥", "✨", "🎉", "🙏", "😮", "😢",
@@ -741,12 +730,14 @@ FocusScope {
   }
 
   function defaultDownloadDir() {
-    var base = Quickshell.env("OMAQ_DOWNLOAD_DIR")
+    var base = Quickshell.env("HARBOR_DOWNLOAD_DIR")
+    if (!base || base.charAt(0) !== "/")
+      base = Quickshell.env("OMAQ_DOWNLOAD_DIR")
     if (!base || base.charAt(0) !== "/")
       base = Quickshell.env("XDG_DOWNLOAD_DIR")
     if (!base || base.charAt(0) !== "/")
       base = (Quickshell.env("HOME") || "") + "/Downloads"
-    return base + "/omaq"
+    return base + "/Harbor"
   }
 
   function isAudioPath(path) {
@@ -2020,7 +2011,7 @@ FocusScope {
     root.pendingImageSendGeneration = Number(
       root.service.helperInstanceGeneration || 0)
     root.showFile = false
-    filePath.text = ""
+    root.selectedFilePath = ""
     root.fileStatus = "Sending…"
     root.fileStatusPath = path
     return true
@@ -2160,10 +2151,6 @@ FocusScope {
       list.positionViewAtEnd()
       return
     }
-    if (root.showFile) {
-      root.closeFileChooser()
-      return
-    }
     root.showFile = true
     if (root.service)
       root.service.dismissFileNotice(root.conversation)
@@ -2171,48 +2158,25 @@ FocusScope {
       root.fileStatus = ""
       root.fileStatusPath = ""
     }
-    filePath.forceActiveFocus()
-  }
-
-  function finishFilePicker() {
-    if (root.filePickerClosing) {
-      root.filePickerClosing = false
-      root.filePickerExitCode = -1
-      root.filePickerStreamDone = false
-      return
-    }
-    if (root.filePickerExitCode < 0 || !root.filePickerStreamDone)
-      return
-    if (root.filePickerExitCode === 0) {
-      var picked = String(filePickerOutput.text || "").trim()
-      if (picked !== "")
-        root.inspectSelectedAttachment(picked)
-    } else if (root.filePickerExitCode === 2) {
-      root.fileStatus = "No file picker found — enter a path manually"
-    }
-    root.filePickerExitCode = -1
-    root.filePickerStreamDone = false
+    root.openFilePicker()
   }
 
   function openFilePicker() {
-    if (!filePicker.running) {
-      root.filePickerClosing = false
-      root.filePickerExitCode = -1
-      root.filePickerStreamDone = false
-      filePicker.running = true
-    }
+    if (filePicker.visible)
+      return
+    filePicker.conversation = root.conversation
+    filePicker.contactKey = root.peerKey
+    filePicker.open()
   }
 
   function closeFileChooser() {
-    root.filePickerClosing = filePicker.running
-    if (filePicker.running)
-      filePicker.running = false
+    filePicker.close()
+    filePicker.conversation = ""
+    filePicker.contactKey = ""
     root.showFile = false
-    root.filePickerExitCode = -1
-    root.filePickerStreamDone = false
     if (root.clipboardStageRequest === "")
       root.cancelAttachmentInspection()
-    filePath.text = ""
+    root.selectedFilePath = ""
     if (!root.restoreOutgoingFileStatus()) {
       root.fileStatus = ""
       root.fileStatusPath = ""
@@ -2241,7 +2205,7 @@ FocusScope {
     root.discardClipboardStage()
     root.cancelAttachmentInspection()
     root.clearPendingImage()
-    filePath.text = selectedPath
+    root.selectedFilePath = selectedPath
     root.attachmentInspectionPath = selectedPath
     root.attachmentInspectionRequest = root.newLocalMessageKey()
     root.fileStatus = "Checking image…"
@@ -2284,7 +2248,7 @@ FocusScope {
     root.clipboardStageRequest = ""
     root.clipboardStagePath = ""
     root.showFile = false
-    filePath.text = ""
+    root.selectedFilePath = ""
     root.fileStatus = ""
     root.fileStatusPath = ""
     input.forceActiveFocus()
@@ -2504,7 +2468,7 @@ FocusScope {
   }
 
   function sendSelectedFile() {
-    var path = String(filePath.text || "").trim()
+    var path = String(root.selectedFilePath || "").trim()
     fileStatusTimer.stop()
     if (!path) {
       root.fileStatus = "Choose a file first"
@@ -2708,21 +2672,25 @@ FocusScope {
     }
   }
 
-  Process {
+  Dialogs.FileDialog {
     id: filePicker
-    command: ["bash", "-c", root.filePickerScript, "omaq-file-picker"]
-    running: false
-    stdout: StdioCollector {
-      id: filePickerOutput
-      waitForEnd: true
-      onStreamFinished: {
-        root.filePickerStreamDone = true
-        root.finishFilePicker()
-      }
+    property string conversation: ""
+    property string contactKey: ""
+    title: "Send file"
+    fileMode: Dialogs.FileDialog.OpenFile
+    onAccepted: {
+      if (conversation !== root.conversation || contactKey !== root.peerKey ||
+          !root.directBindingValid)
+        return
+      var path = root.localPathFromUrl(selectedFile)
+      if (path !== "")
+        root.inspectSelectedAttachment(path)
+      else
+        root.fileStatus = "Choose a local file"
     }
-    onExited: function(code) {
-      root.filePickerExitCode = code
-      root.finishFilePicker()
+    onRejected: {
+      root.showFile = false
+      input.forceActiveFocus()
     }
   }
 
@@ -3202,6 +3170,7 @@ FocusScope {
   }
 
   onConversationChanged: {
+    filePicker.close()
     imagePreview.close()
     root.stopTyping()
     root.searchOpen = false
@@ -3246,6 +3215,7 @@ FocusScope {
   }
 
   onPeerKeyChanged: {
+    filePicker.close()
     imagePreview.close()
     root.searchOpen = false
     root.resetSearchResults()
@@ -3258,6 +3228,7 @@ FocusScope {
 
   onDirectBindingValidChanged: {
     if (!root.directBindingValid) {
+      filePicker.close()
       imagePreview.close()
       root.stopTyping()
       root.searchOpen = false
@@ -4026,7 +3997,7 @@ FocusScope {
             height: visible ? implicitHeight : 0
             spacing: Style.space(8)
             ChatBtn {
-              text: "Accept file"
+              text: "Download"
               bordered: true
               onClicked: {
                 if (root.demo) {
@@ -5056,7 +5027,7 @@ FocusScope {
       }
 
       ColumnLayout {
-        visible: !root.demo && root.showFile
+        visible: !root.demo && root.showFile && root.selectedFilePath !== ""
         Layout.fillWidth: true
         Layout.preferredHeight: visible ? implicitHeight : 0
         Layout.minimumHeight: visible ? implicitHeight : 0
@@ -5068,7 +5039,7 @@ FocusScope {
 
           Harbor.SafeText {
             Layout.fillWidth: true
-            text: "File transfer"
+            text: "Attachment"
             color: root.fg
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -5076,8 +5047,8 @@ FocusScope {
           }
 
           FormatBtn {
-            materialIcon: "expand_more"
-            helpText: "Collapse file transfer"
+            materialIcon: "close"
+            helpText: "Remove attachment"
             onClicked: root.closeFileChooser()
           }
         }
@@ -5086,32 +5057,24 @@ FocusScope {
           Layout.fillWidth: true
           spacing: Style.space(6)
 
-          TextField {
-            id: filePath
+          Harbor.SafeText {
             Layout.fillWidth: true
-            activeFocusOnTab: true
-            enabled: !root.service || !root.service.fileSendingFor(root.conversation)
-            foreground: root.fg
-            accent: root.accent
-            placeholderText: "Absolute file path"
-            onTextChanged: {
-              if (!root.restoreOutgoingFileStatus()) {
-                root.fileStatus = ""
-                root.fileStatusPath = ""
-              }
-            }
-            onAccepted: root.sendSelectedFile()
+            text: String(root.selectedFilePath).split("/").pop()
+            color: root.fg
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            elide: Text.ElideMiddle
           }
           ChatBtn {
             id: chooseFileBtn
-            text: "Choose"
+            text: "Change"
             bordered: true
             enabled: !root.service || !root.service.fileSendingFor(root.conversation)
             onClicked: root.openFilePicker()
           }
           ChatBtn {
             id: sendFileBtn
-            text: "Send file"
+            text: "Send"
             bordered: true
             enabled: !root.service || !root.service.fileSendingFor(root.conversation)
             onClicked: root.sendSelectedFile()
@@ -5144,7 +5107,8 @@ FocusScope {
 
           Harbor.SafeText {
             id: statusPathText
-            visible: root.reactionStatus === "" && root.fileStatusPath !== ""
+            visible: root.reactionStatus === "" && root.fileStatusPath !== "" &&
+              !(root.showFile && root.selectedFilePath !== "")
             Layout.fillWidth: true
             text: root.fileStatusPath
             color: root.accent

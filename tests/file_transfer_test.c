@@ -215,7 +215,7 @@ int main(void)
 	{
 		char download_dir[512], existing[512], expected[512];
 		FILE *fixture = NULL;
-		if (snprintf(download_dir, sizeof(download_dir), "%s/omaq", home) >=
+		if (snprintf(download_dir, sizeof(download_dir), "%s/Harbor", home) >=
 		    (int)sizeof(download_dir) || mkdir(download_dir, 0700) != 0 ||
 		    snprintf(existing, sizeof(existing), "%s/song.mp3", download_dir) >=
 		    (int)sizeof(existing) ||

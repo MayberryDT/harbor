@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
-import QtQuick.Effects
 import QtQuick.Controls as Controls
+import QtQuick.Dialogs as Dialogs
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
@@ -17,6 +17,114 @@ BarWidget {
   moduleName: "io.zet.harbor"
 
   property bool opened: false
+  property bool addOpen: false
+  property bool devicesOpen: false
+  property string settingsPage: ""
+  property string prepareDeviceInviteRequest: ""
+  property bool recoveryDetailsOpen: false
+  property bool restoreAfterValidation: false
+  property string restorePassword: ""
+
+  function openSettingsPage(page) {
+    root.dismissTransientSections()
+    root.settingsOpen = true
+    root.settingsPage = page
+    root.devicesOpen = page === "devices"
+    root.soundOpen = page === "notifications"
+    root.themeOpen = page === "appearance"
+    root.fontSizeOpen = page === "appearance"
+    root.moreOpen = page === "recovery" || page === "advanced"
+    root.moreSection = page === "recovery" ? "identity" : page === "advanced" ? "danger" : ""
+    if (page === "devices") omaq.manageDevice("device.status", "", "", false)
+  }
+
+  function addComputer() {
+    if (omaq.deviceActive) { root.openDeviceInvite(); return }
+    if (omaq.manageDevice("device.initialize", "My computer", "", false))
+      root.prepareDeviceInviteRequest = omaq.deviceRequest
+  }
+
+  Timer {
+    id: preparedDeviceInvite
+    interval: 0
+    onTriggered: {
+      if (root.prepareDeviceInviteRequest === "") return
+      root.prepareDeviceInviteRequest = ""
+      if (root.devicesOpen && omaq.deviceActive && !omaq.deviceFeedbackError)
+        root.openDeviceInvite()
+    }
+  }
+  Connections {
+    target: omaq
+    function onDeviceRequestChanged() {
+      if (omaq.deviceRequest === "" && root.prepareDeviceInviteRequest !== "")
+        preparedDeviceInvite.restart()
+    }
+    function onHelperInstanceGenerationChanged() { root.prepareDeviceInviteRequest = "" }
+  }
+  property bool deviceInviteMode: false
+  property string deviceSetupChoice: ""
+  property string deviceRevokeKey: ""
+  property string deviceRevokeName: ""
+  property string conversationQuery: ""
+  property var conversationOrder: []
+
+  function snapshotConversationOrder() {
+    var rows = root.conversationRows(true)
+    rows.sort(function(a, b) {
+      return omaq.conversationPreview(b.id, b.key).ts - omaq.conversationPreview(a.id, a.key).ts
+    })
+    root.conversationOrder = rows.map(function(row) { return row.group ? row.id : "d:" + row.key })
+  }
+  function activityTime(timestamp) {
+    if (!(timestamp > 0)) return ""
+    var date = new Date(timestamp * 1000)
+    var today = new Date()
+    return Qt.formatDateTime(date, date.toDateString() === today.toDateString() ? "HH:mm" : "MMM d")
+  }
+
+  function conversationRows(ignoreSearch) {
+    var query = ignoreSearch ? "" : root.conversationQuery.trim().toLocaleLowerCase()
+    var rows = []
+    var friends = omaq.friends || []
+    var groups = omaq.groups || []
+    for (var i = 0; i < friends.length; i++) {
+      var friend = friends[i]
+      var name = String(friend.name || "Friend")
+      if (!query || name.toLocaleLowerCase().indexOf(query) >= 0)
+        rows.push({ id: String(friend.id), name: name, group: false,
+          key: root.friendKey(friend.id), avatar: friend.avatar || "",
+          online: !!friend.online, status: root.friendStatus(friend) })
+    }
+    for (var j = 0; j < groups.length; j++) {
+      var group = groups[j]
+      var title = String(group.title || "Group")
+      if (!query || title.toLocaleLowerCase().indexOf(query) >= 0)
+        rows.push({ id: String(group.id), name: title, group: true, key: "",
+          avatar: "", online: false,
+          status: String(group.memberCount || 0) + " members" })
+    }
+    // Reorder only when opening; previews may update without moving a target.
+    var order = root.conversationOrder
+    rows.sort(function(a, b) {
+      var ai = order.indexOf(a.group ? a.id : "d:" + a.key)
+      var bi = order.indexOf(b.group ? b.id : "d:" + b.key)
+      return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi)
+    })
+    return rows
+  }
+
+  function openConversation(row) {
+    if (row.group)
+      root.openGroup(row.id)
+    else if (root.friendMatches(row.id, row.key))
+      root.openFriend(row.id, row.name)
+  }
+
+  function openAdd() {
+    root.dismissTransientSections()
+    root.addOpen = true
+  }
   property string redeemDraft: ""
   property string redeemRequest: ""
   property string redeemFeedback: ""
@@ -39,6 +147,9 @@ BarWidget {
   property bool showJoin: false
   property bool chatPickerOpen: false
   property bool inviteOpen: false
+  property bool inviteRequireApproval: false
+  property bool inviteActionRequireApproval: false
+  property int inviteActionLifetime: 86400
   property string inviteConfirmMode: ""
   property bool inviteActionPending: false
   property string inviteActionMode: ""
@@ -171,16 +282,15 @@ BarWidget {
   readonly property real railWidth: railIconWidth * 2 + framePadding * 2
   readonly property real headerHeight: Style.space(48)
   readonly property real pendingDirectHeaderHeight: Style.space(156)
-  readonly property real supportGlyphSize: Style.font.icon + Style.space(3)
   readonly property real basePrimaryAreaHeight: Math.max(
-    identityContactsFrame.implicitHeight, actionRail.implicitHeight)
+    identityContactsFrame.implicitHeight, Style.space(160))
   readonly property real primaryAreaHeight: root.primaryMenuOpen
     ? Math.max(column.implicitHeight + root.framePadding * 2,
                root.basePrimaryAreaHeight)
     : root.basePrimaryAreaHeight
   readonly property real actionButtonHeight: Style.space(24)
   readonly property color onlineStatusColor: "#7dce6a"
-  readonly property bool primaryMenuOpen: root.inviteOpen || root.showJoin ||
+  readonly property bool primaryMenuOpen: root.devicesOpen || root.addOpen || root.inviteOpen || root.showJoin ||
     root.chatPickerOpen || root.settingsOpen || root.moreOpen || omaq.locked ||
     omaq.incomingCall || root.nicknameFeedback !== ""
   readonly property int visibleUnreadCount: Math.max(omaq.unreadCount, omaq.localUnreadTotal())
@@ -217,46 +327,6 @@ BarWidget {
   }
   readonly property real caretCenterX: Math.max(10, Math.min(card.width - 10,
     Math.round(anchorCenterX)))
-  readonly property string avatarPickerScript:
-    "if command -v zenity >/dev/null 2>&1; then\n" +
-    "  exec zenity --file-selection --title='Set avatar' --file-filter='Images | *.png *.jpg *.jpeg *.webp'\n" +
-    "elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "  exec kdialog --getopenfilename \"$HOME\" '*.png *.jpg *.jpeg *.webp|Images'\n" +
-    "elif command -v yad >/dev/null 2>&1; then\n" +
-    "  exec yad --file --title='Set avatar'\n" +
-    "fi\n" +
-    "exit 2\n"
-  readonly property string soundPickerScript:
-    "if command -v zenity >/dev/null 2>&1; then\n" +
-    "  exec zenity --file-selection --title='Import notification sound' --file-filter='PCM WAV audio | *.wav'\n" +
-    "elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "  exec kdialog --getopenfilename \"$HOME\" '*.wav|PCM WAV audio'\n" +
-    "elif command -v yad >/dev/null 2>&1; then\n" +
-    "  exec yad --file --title='Import notification sound'\n" +
-    "fi\n" +
-    "exit 2\n"
-  readonly property string identityPickerScript:
-    "mode=$1\n" +
-    "downloads=${XDG_DOWNLOAD_DIR:-$HOME/Downloads}\n" +
-    "if [ \"$mode\" = export ]; then\n" +
-    "  initial=$downloads/omaq-identity.save\n" +
-    "  if command -v zenity >/dev/null 2>&1; then\n" +
-    "    exec zenity --file-selection --save --confirm-overwrite --title='Export Harbor identity' --filename=\"$initial\" --file-filter='Harbor identity | *.save'\n" +
-    "  elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "    exec kdialog --getsavefilename \"$initial\" '*.save|Harbor identity'\n" +
-    "  elif command -v yad >/dev/null 2>&1; then\n" +
-    "    exec yad --file --save --confirm-overwrite --title='Export Harbor identity' --filename=\"$initial\"\n" +
-    "  fi\n" +
-    "else\n" +
-    "  if command -v zenity >/dev/null 2>&1; then\n" +
-    "    exec zenity --file-selection --title='Select Harbor identity' --file-filter='Harbor identity | *.save'\n" +
-    "  elif command -v kdialog >/dev/null 2>&1; then\n" +
-    "    exec kdialog --getopenfilename \"$HOME\" '*.save|Harbor identity'\n" +
-    "  elif command -v yad >/dev/null 2>&1; then\n" +
-    "    exec yad --file --title='Select Harbor identity'\n" +
-    "  fi\n" +
-    "fi\n" +
-    "exit 2\n"
   readonly property real barThickness: {
     var n = bar && bar.barSize !== undefined ? Number(bar.barSize) : NaN
     return isFinite(n) && n > 0 ? n : Style.bar.sizeHorizontal
@@ -372,6 +442,49 @@ BarWidget {
         font.bold: true
       }
     }
+  }
+
+  component SettingsRow: Rectangle {
+    id: settingRow
+    property string label: ""
+    property string value: ""
+    signal clicked()
+    width: parent ? parent.width : 0
+    implicitHeight: Style.space(54)
+    radius: root.controlRadius
+    color: activeFocus || rowMouse.containsMouse ? root.controlHoverFill : "transparent"
+    activeFocusOnTab: true
+    Accessible.role: Accessible.Button
+    Accessible.name: label + (value ? ", " + value : "")
+    Accessible.onPressAction: if (enabled) clicked()
+    Keys.onReturnPressed: if (enabled) clicked()
+    Keys.onEnterPressed: if (enabled) clicked()
+    Keys.onSpacePressed: if (enabled) clicked()
+    onActiveFocusChanged: if (activeFocus) root.ensurePanelItemVisible(settingRow)
+    Column {
+      anchors.left: parent.left; anchors.right: arrow.left
+      anchors.margins: Style.space(10); anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.space(3)
+      SafeText {
+        width: parent.width; text: settingRow.label
+        color: root.foreground; font.family: root.fontFamily
+        font.pixelSize: Style.font.body; elide: Text.ElideRight
+      }
+      SafeText {
+        width: parent.width; text: settingRow.value; visible: text !== ""
+        color: root.dim; font.family: root.fontFamily
+        font.pixelSize: Style.font.caption; elide: Text.ElideRight
+      }
+    }
+    SafeText {
+      id: arrow; anchors.right: parent.right; anchors.rightMargin: Style.space(10)
+      anchors.verticalCenter: parent.verticalCenter
+      text: Harbor.MaterialSymbols.ready ? Harbor.MaterialSymbols.glyph("chevron_right") : ""
+      font.family: Harbor.MaterialSymbols.family
+      font.pixelSize: Style.font.icon; color: root.dim
+    }
+    MouseArea { id: rowMouse; anchors.fill: parent; hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor; onClicked: settingRow.clicked() }
   }
 
   component TokenButton: BorderSurface {
@@ -646,7 +759,9 @@ BarWidget {
   function open() {
     if (root.opened)
       return
+    root.snapshotConversationOrder()
     root.opened = true
+    omaq.refreshConversationPreviews()
     omaq.sendOp({ op: "status" })
     if (bar && typeof bar.requestPopout === "function") {
       var screenName = popup.screen ? String(popup.screen.name || "") : ""
@@ -657,6 +772,17 @@ BarWidget {
   function close() {
     if (!root.opened)
       return
+    root.settingsPage = ""
+    root.prepareDeviceInviteRequest = ""
+    root.restoreAfterValidation = false
+    root.restorePassword = ""
+    root.recoveryDetailsOpen = false
+    root.devicesOpen = false
+    root.deviceInviteMode = false
+    root.deviceSetupChoice = ""
+    root.deviceRevokeKey = ""
+    root.deviceRevokeName = ""
+    root.addOpen = false
     root.showJoin = false
     root.redeemRequest = ""
     root.redeemFeedback = ""
@@ -683,7 +809,7 @@ BarWidget {
     root.soundRemoveId = ""
     root.soundRemoveLabel = ""
     root.soundRemovePath = ""
-    if (root.soundActionRequest === "" && !soundPick.running) {
+    if (root.soundActionRequest === "" && !soundPick.visible) {
       root.soundAction = ""
       root.soundFeedback = ""
       root.soundFeedbackError = false
@@ -735,6 +861,17 @@ BarWidget {
   }
 
   function dismissTransientSections() {
+    root.settingsPage = ""
+    root.prepareDeviceInviteRequest = ""
+    root.restoreAfterValidation = false
+    root.restorePassword = ""
+    root.recoveryDetailsOpen = false
+    root.devicesOpen = false
+    root.deviceInviteMode = false
+    root.deviceSetupChoice = ""
+    root.deviceRevokeKey = ""
+    root.deviceRevokeName = ""
+    root.addOpen = false
     root.inviteOpen = false
     root.inviteConfirmMode = ""
     if (!root.inviteActionPending) {
@@ -757,7 +894,7 @@ BarWidget {
     root.soundRemoveId = ""
     root.soundRemoveLabel = ""
     root.soundRemovePath = ""
-    if (root.soundActionRequest === "" && !soundPick.running) {
+    if (root.soundActionRequest === "" && !soundPick.visible) {
       root.soundAction = ""
       root.soundFeedback = ""
       root.soundFeedbackError = false
@@ -956,13 +1093,17 @@ BarWidget {
       return false
     omaq.clearRequestError(root.inviteFeedbackRequest)
     root.inviteFeedbackRequest = ""
+    if (mode !== "replace-create") {
+      root.inviteActionRequireApproval = !root.deviceInviteMode && root.inviteRequireApproval
+      root.inviteActionLifetime = root.deviceInviteMode ? 300 : 86400
+    }
     root.inviteActionMode = String(mode || "create")
     root.inviteActionRequest = root.nextInviteActionRequest()
     root.inviteActionGeneration = Number(omaq.reconnectGeneration || 0)
     root.inviteActionPending = true
     root.inviteFeedback = "Creating invite…"
     root.inviteFeedbackError = false
-    if (!omaq.createInvite(root.inviteActionRequest)) {
+    if (!omaq.createInvite(root.inviteActionRequest, root.inviteActionRequireApproval, root.inviteActionLifetime)) {
       root.failInviteAction("Harbor is not ready to create an invite.")
       return false
     }
@@ -976,6 +1117,10 @@ BarWidget {
     root.inviteConfirmMode = ""
     omaq.clearRequestError(root.inviteFeedbackRequest)
     root.inviteFeedbackRequest = ""
+    if (replaceAfter) {
+      root.inviteActionRequireApproval = !root.deviceInviteMode && root.inviteRequireApproval
+      root.inviteActionLifetime = root.deviceInviteMode ? 300 : 86400
+    }
     root.inviteActionMode = replaceAfter ? "replace-revoke" : "revoke"
     root.inviteActionRequest = root.nextInviteActionRequest()
     root.inviteActionGeneration = Number(omaq.reconnectGeneration || 0)
@@ -1029,6 +1174,16 @@ BarWidget {
     root.safetyCopied = false
   }
 
+  function openDeviceInvite() {
+    root.dismissTransientSections()
+    root.settingsPage = "devices"
+    root.deviceInviteMode = true
+    root.inviteOpen = true
+    root.inviteNow = Math.floor(Date.now() / 1000)
+    if (omaq.inviteUrl) root.inviteConfirmMode = "replace"
+    else root.startInviteCreate("create")
+  }
+
   function toggleInvite() {
     var open = !root.inviteOpen
     root.dismissTransientSections()
@@ -1063,26 +1218,9 @@ BarWidget {
     }
   }
 
-  function openRailFontSize() {
-    var open = !(root.settingsOpen && root.fontSizeOpen)
-    root.dismissTransientSections()
-    root.settingsOpen = open
-    root.fontSizeOpen = open
-  }
-
-  function openRailTheme() {
-    var open = !(root.settingsOpen && root.themeOpen)
-    root.dismissTransientSections()
-    root.settingsOpen = open
-    root.themeOpen = open
-  }
-
-  function openRailSounds() {
-    var open = !(root.settingsOpen && root.soundOpen)
-    root.dismissTransientSections()
-    root.settingsOpen = open
-    root.soundOpen = open
-  }
+  function openRailFontSize() { root.openSettingsPage("appearance") }
+  function openRailTheme() { root.openSettingsPage("appearance") }
+  function openRailSounds() { root.openSettingsPage("notifications") }
 
   function friendStatus(friend) {
     if (omaq.connectionState !== "online")
@@ -1188,35 +1326,19 @@ BarWidget {
     return "file://" + parts.join("/")
   }
 
-  function finishAvatarPicker() {
-    if (root.avatarPickExitCode < 0 || !root.avatarPickStreamDone)
-      return
-    var p = String(avatarPickOutput.text || "").trim()
-    var restore = root.avatarRestorePending
-    var restoreMore = root.avatarRestoreMore
-    if (root.avatarPickExitCode === 0 && p !== "")
-      omaq.setAvatar(p)
-    root.avatarPickExitCode = -1
-    root.avatarPickStreamDone = false
-    root.avatarRestorePending = false
-    if (restore) {
-      root.opened = false
-      if (bar && typeof bar.releasePopout === "function" && bar.activePopout === root)
-        bar.releasePopout(root)
-      Qt.callLater(function() {
-        root.open()
-        root.moreOpen = restoreMore
-      })
-    }
+  function selectedLocalPath(url) {
+    var value = String(url || "")
+    if (value.indexOf("file:///") !== 0)
+      return ""
+    try {
+      var path = decodeURIComponent(value.slice(7))
+      return path.length < 512 && path.indexOf("\u0000") < 0 ? path : ""
+    } catch (error) { return "" }
   }
 
   function pickSelfAvatar() {
-    avatarRestorePending = root.opened
-    avatarRestoreMore = root.moreOpen
-    avatarPickExitCode = -1
-    avatarPickStreamDone = false
-    avatarPick.running = false
-    avatarPick.running = true
+    avatarPick.identity = omaq.identityFingerprint
+    avatarPick.open()
   }
 
   function identityPassphraseStats(value) {
@@ -1327,6 +1449,8 @@ BarWidget {
     root.identityActionPending = false
     root.identityFeedbackError = !success
     root.identityFeedback = String(message || "")
+    root.restorePassword = ""
+    root.restoreAfterValidation = false
     root.identityAction = ""
     root.identityRequest = ""
     passField.text = ""
@@ -1372,13 +1496,15 @@ BarWidget {
     root.identityRequest = Date.now().toString(36) + "-identity-" +
       root.identityRequestSequence.toString(36) + "-" +
       Math.floor(Math.random() * 0x100000000).toString(36)
+    if (key === "import" && root.restoreAfterValidation)
+      root.restorePassword = passphrase
     root.identityAction = key
     root.identityFeedbackRequest = root.identityRequest
     root.identityActionPending = true
     root.identityFeedbackError = false
-    root.identityFeedback = key === "export" ? "Exporting identity…"
-      : key === "import" ? "Checking identity bundle…"
-      : key === "replace" ? "Importing identity…"
+    root.identityFeedback = key === "export" ? "Saving backup…"
+      : key === "import" ? "Checking backup…"
+      : key === "replace" ? "Restoring backup…"
       : key === "unprotect" ? "Removing identity protection…"
       : key === "unlock" ? "Unlocking identity…"
       : "Protecting identity…"
@@ -1405,7 +1531,7 @@ BarWidget {
   }
 
   function startIdentityPicker(mode) {
-    if (!omaq.supportsIdentityActions || root.identityActionPending || identityPick.running)
+    if (!omaq.supportsIdentityActions || root.identityActionPending || identityPick.visible)
       return
     root.identityPickerMode = String(mode || "import")
     root.identityPickerExitCode = -1
@@ -1415,18 +1541,14 @@ BarWidget {
     root.identityFeedbackRequest = ""
     root.identityFeedbackError = false
     root.identityFeedback = root.identityPickerMode === "export"
-      ? "Choose where to export the private identity bundle."
-      : "Choose a Harbor identity bundle."
-    identityPick.running = false
-    identityPick.running = true
+      ? "Choose where to save this computer’s backup."
+      : "Choose a Harbor backup to check."
+    identityPick.identity = omaq.identityFingerprint
+    identityPick.open()
   }
 
-  function finishIdentityPicker() {
-    if (root.identityPickerExitCode < 0 || !root.identityPickerStreamDone)
-      return
+  function finishIdentityPicker(path, code) {
     var mode = root.identityPickerMode
-    var path = String(identityPickOutput.text || "").trim()
-    var code = root.identityPickerExitCode
     root.identityPickerExitCode = -1
     root.identityPickerStreamDone = false
     root.identityPickerMode = ""
@@ -1452,17 +1574,15 @@ BarWidget {
     }
     importPath.text = path
     if (mode === "replace") {
-      root.replaceIdentityPath = path
-      root.replaceIdentityConfirm = true
-      root.identityFeedbackError = false
-      root.identityFeedback = "Review the selected bundle before importing this identity."
+      root.restoreAfterValidation = true
+      if (!root.runIdentityAction("import", path)) root.restoreAfterValidation = false
       return
     }
     root.runIdentityAction("import", path)
   }
 
   function resetIdentityControls() {
-    if (!root.identityActionPending && !identityPick.running) {
+    if (!root.identityActionPending && !identityPick.visible) {
       var feedbackRequest = root.identityFeedbackRequest
       root.identityAction = ""
       root.identityRequest = ""
@@ -1675,22 +1795,18 @@ BarWidget {
   }
 
   function startSoundPicker() {
-    if (!omaq.supportsCustomSounds || soundPick.running ||
+    if (!omaq.supportsCustomSounds || soundPick.visible ||
         root.soundActionRequest !== "")
       return
     root.soundPickerExitCode = -1
     root.soundPickerStreamDone = false
     root.soundFeedback = "Choose a PCM WAV notification sound to import."
     root.soundFeedbackError = false
-    soundPick.running = false
-    soundPick.running = true
+    soundPick.identity = omaq.identityFingerprint
+    soundPick.open()
   }
 
-  function finishSoundPicker() {
-    if (root.soundPickerExitCode < 0 || !root.soundPickerStreamDone)
-      return
-    var code = root.soundPickerExitCode
-    var path = String(soundPickOutput.text || "").trim()
+  function finishSoundPicker(path, code) {
     root.soundPickerExitCode = -1
     root.soundPickerStreamDone = false
     if (code !== 0 || path === "") {
@@ -1759,14 +1875,6 @@ BarWidget {
       root.themeOpen = false
       root.fontSizeOpen = false
     }
-  }
-
-  function openRepo() {
-    Quickshell.execDetached(["xdg-open", "https://github.com/MayberryDT/harbor"])
-  }
-
-  function openKoFi() {
-    Quickshell.execDetached(["xdg-open", "https://ko-fi.com/hancore"])
   }
 
   function parseSystemColors(raw) {
@@ -1893,67 +2001,55 @@ BarWidget {
   Service {
     id: omaq
     settings: root.settings
+    onFriendsReadyChanged: if (root.opened && friendsReady) refreshConversationPreviews()
+    onGroupsReadyChanged: if (root.opened && groupsReady) refreshConversationPreviews()
+    onDeviceLinkInvitation: {
+      if (!chatSurface.isSurfaceOwner) return
+      root.dismissTransientSections()
+      root.devicesOpen = true
+      root.open()
+      chatSurface.playSound()
+    }
+    onNotificationMuteRequested: function(muted) {
+      root.persistSettings({ notificationMuted: muted })
+    }
   }
 
-  Process {
+  Dialogs.FileDialog {
     id: avatarPick
-    running: false
-    command: ["bash", "-c", root.avatarPickerScript, "omaq-avatar-picker"]
-    stdout: StdioCollector {
-      id: avatarPickOutput
-      waitForEnd: true
-      onStreamFinished: {
-        root.avatarPickStreamDone = true
-        root.finishAvatarPicker()
-      }
+    property string identity: ""
+    title: "Choose your profile picture"
+    fileMode: Dialogs.FileDialog.OpenFile
+    nameFilters: ["Images (*.png *.jpg *.jpeg *.webp)"]
+    onAccepted: {
+      var path = root.selectedLocalPath(selectedFile)
+      if (path && identity === omaq.identityFingerprint)
+        omaq.setAvatar(path)
     }
-    onExited: function(code) {
-      root.avatarPickExitCode = code
-      root.finishAvatarPicker()
-    }
-    onRunningChanged: if (!running && root.opened)
-      Qt.callLater(function() { if (root.opened) panelFocus.forceActiveFocus() })
   }
 
-  Process {
+  Dialogs.FileDialog {
     id: soundPick
-    running: false
-    command: ["bash", "-c", root.soundPickerScript, "omaq-sound-picker"]
-    stdout: StdioCollector {
-      id: soundPickOutput
-      waitForEnd: true
-      onStreamFinished: {
-        root.soundPickerStreamDone = true
-        root.finishSoundPicker()
-      }
-    }
-    onExited: function(code) {
-      root.soundPickerExitCode = code
-      root.finishSoundPicker()
-    }
-    onRunningChanged: if (!running && root.opened)
-      Qt.callLater(function() { if (root.opened) panelFocus.forceActiveFocus() })
+    property string identity: ""
+    title: "Import notification sound"
+    fileMode: Dialogs.FileDialog.OpenFile
+    nameFilters: ["PCM WAV audio (*.wav)"]
+    onAccepted: root.finishSoundPicker(root.selectedLocalPath(selectedFile),
+      identity === omaq.identityFingerprint ? 0 : 1)
+    onRejected: root.finishSoundPicker("", 1)
   }
 
-  Process {
+  Dialogs.FileDialog {
     id: identityPick
-    running: false
-    command: ["bash", "-c", root.identityPickerScript,
-              "omaq-identity-picker", root.identityPickerMode]
-    stdout: StdioCollector {
-      id: identityPickOutput
-      waitForEnd: true
-      onStreamFinished: {
-        root.identityPickerStreamDone = true
-        root.finishIdentityPicker()
-      }
-    }
-    onExited: function(code) {
-      root.identityPickerExitCode = code
-      root.finishIdentityPicker()
-    }
-    onRunningChanged: if (!running && root.opened)
-      Qt.callLater(function() { if (root.opened) panelFocus.forceActiveFocus() })
+    property string identity: ""
+    title: root.identityPickerMode === "export" ? "Save Harbor backup" : "Choose a Harbor backup"
+    fileMode: root.identityPickerMode === "export"
+      ? Dialogs.FileDialog.SaveFile : Dialogs.FileDialog.OpenFile
+    nameFilters: ["Harbor identity (*.save)", "All files (*)"]
+    defaultSuffix: "save"
+    onAccepted: root.finishIdentityPicker(root.selectedLocalPath(selectedFile),
+      identity === omaq.identityFingerprint ? 0 : 1)
+    onRejected: root.finishIdentityPicker("", 1)
   }
 
   Timer {
@@ -1991,7 +2087,7 @@ BarWidget {
 
   Timer {
     id: nicknameSubmitTimer
-    interval: 10000
+    interval: 30000
     repeat: false
     onTriggered: {
       root.nicknameSubmitPending = false
@@ -2302,16 +2398,24 @@ BarWidget {
       if (root.identityAction === "unlock" && op === "unlock")
         root.finishIdentityAction(true, "Identity unlocked.")
       else if (root.identityAction === "protect" && op === "protect")
-        root.finishIdentityAction(true, "Identity protection enabled.")
+        root.finishIdentityAction(true, "Password protection enabled.")
       else if (root.identityAction === "unprotect" &&
                (op === "unprotect" || (op === "protect" && !omaq.lastIdentityProtected)))
-        root.finishIdentityAction(true, "Identity protection removed.")
+        root.finishIdentityAction(true, "Password protection removed.")
       else if (root.identityAction === "export" && op === "export")
-        root.finishIdentityAction(true, "Identity exported to " +
+        root.finishIdentityAction(true, "Backup saved to " +
           String(omaq.lastIdentityPath || "the selected file") + ".")
-      else if (root.identityAction === "import" && op === "inspect")
-        root.finishIdentityAction(true,
-          "Identity bundle validated. Use Import identity to activate it.")
+      else if (root.identityAction === "import" && op === "inspect") {
+        var restore = root.restoreAfterValidation
+        var checkedPassword = root.restorePassword
+        root.restoreAfterValidation = false
+        root.finishIdentityAction(true, "Backup checked.")
+        if (restore && root.settingsPage === "recovery") {
+          root.restorePassword = checkedPassword
+          root.replaceIdentityPath = importPath.text.trim()
+          root.replaceIdentityConfirm = root.replaceIdentityPath !== ""
+        }
+      }
       else if (root.identityAction === "replace" && op === "import")
         root.finishIdentityAction(true,
           "Identity imported. Existing direct contacts must be removed on both sides and re-invited before messaging.")
@@ -2460,7 +2564,7 @@ BarWidget {
       return !!(window && window.active)
     }
 
-    WlrLayershell.namespace: "omaq-panel"
+    WlrLayershell.namespace: "harbor-panel"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
@@ -2473,12 +2577,12 @@ BarWidget {
     HyprlandFocusGrab {
       id: clickAwayGrab
       active: root.opened && popup.visible && !root.avatarRestorePending &&
-        root.identityPickerMode === "" && !avatarPick.running && !identityPick.running &&
-        !soundPick.running
+        root.identityPickerMode === "" && !avatarPick.visible && !identityPick.visible &&
+        !soundPick.visible
       windows: [popup]
       onCleared: if (root.opened && !root.avatarRestorePending &&
                      root.identityPickerMode === "" &&
-                     !avatarPick.running && !identityPick.running && !soundPick.running)
+                     !avatarPick.visible && !identityPick.visible && !soundPick.visible)
         root.close()
     }
 
@@ -2501,12 +2605,12 @@ BarWidget {
         observedActiveFocus = true
         return
       }
-      if (!observedActiveFocus || !root.opened || avatarPick.running ||
-          identityPick.running || soundPick.running)
+      if (!observedActiveFocus || !root.opened || avatarPick.visible ||
+          identityPick.visible || soundPick.visible)
         return
       Qt.callLater(function() {
         if (root.opened && !popup.backingWindowActive &&
-            !avatarPick.running && !identityPick.running && !soundPick.running)
+            !avatarPick.visible && !identityPick.visible && !soundPick.visible)
           root.close()
       })
     }
@@ -2714,7 +2818,7 @@ BarWidget {
       MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.AllButtons
-        onClicked: root.dismissTransientSections()
+        onClicked: panelFocus.forceActiveFocus()
       }
 
       FocusScope {
@@ -2729,8 +2833,7 @@ BarWidget {
           anchors.topMargin: root.pad
           anchors.left: parent.left
           anchors.leftMargin: root.pad
-          width: Math.max(0, parent.width - root.pad * 2 - root.railWidth -
-                          root.panelSectionGap)
+          width: Math.max(0, parent.width - root.pad * 2)
           height: omaq.pending && !omaq.pendingGroup &&
             omaq.supportsInviteRequestSafety
             ? root.pendingDirectHeaderHeight : root.headerHeight
@@ -2778,8 +2881,8 @@ BarWidget {
             Column {
               id: selfHeaderContent
               visible: !omaq.pending
-              width: Math.max(0, parent.width - selfHeaderAvatar.width -
-                              parent.spacing)
+              width: Math.max(0, parent.width - selfHeaderAvatar.width - (headerActions.visible ? headerActions.width : 0) -
+                              parent.spacing * 2)
               anchors.verticalCenter: parent.verticalCenter
               spacing: 0
 
@@ -2836,7 +2939,7 @@ BarWidget {
                   id: nicknameButton
                   iconText: "check"
                   iconFontFamily: "Material Symbols Rounded"
-                  text: ""
+                  text: omaq.selfNickname === "" ? "Start" : ""
                   width: implicitWidth
                   height: parent.height
                   focusable: true
@@ -2857,8 +2960,9 @@ BarWidget {
                     root.nicknameRequest = Date.now().toString(36) + "-nickname-" +
                       root.nicknameRequestSequence.toString(36) + "-" +
                       Math.floor(Math.random() * 0x100000000).toString(36)
-                    root.nicknameSubmitPending = omaq.setNickname(
-                      nicknameField.text, root.nicknameRequest)
+                    root.nicknameSubmitPending = omaq.selfNickname === ""
+                      ? omaq.createIdentity(nicknameField.text, root.nicknameRequest)
+                      : omaq.setNickname(nicknameField.text, root.nicknameRequest)
                     if (root.nicknameSubmitPending) {
                       nicknameSubmitTimer.restart()
                     } else {
@@ -2909,6 +3013,23 @@ BarWidget {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 elide: Text.ElideRight
+              }
+            }
+
+            Row {
+              id: headerActions
+              visible: !omaq.pending && !root.nicknameEditOpen && omaq.selfNickname !== ""
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(4)
+              ActionButton {
+                text: "Add"
+                enabled: !omaq.locked
+                onClicked: root.openAdd()
+              }
+              RailIcon {
+                materialIcon: "settings"
+                label: "Settings"
+                onClicked: root.toggleSettings()
               }
             }
 
@@ -3036,94 +3157,17 @@ BarWidget {
           }
         }
 
-        Rectangle {
-          id: supportLinks
-          anchors.top: parent.top
-          anchors.topMargin: root.pad
-          anchors.right: parent.right
-          anchors.rightMargin: root.pad
-          width: root.railWidth
-          height: root.headerHeight
-          radius: root.themedRadius(height)
-          color: "transparent"
-          border.color: root.controlBorder
-          border.width: 1
-          z: 20
-
-          Row {
-            id: supportGlyphRow
-            anchors.centerIn: parent
-            spacing: 0
-
-            TokenButton {
-              id: githubSupportButton
-              width: root.railIconWidth
-              height: Style.space(30)
-              borderless: true
-              accent: root.systemColors[3] || root.controlAccent
-              tooltipText: "Open Harbor on GitHub"
-              accessibleName: tooltipText
-              focusable: true
-              horizontalPadding: Style.space(2)
-              verticalPadding: Style.space(2)
-              onClicked: root.openRepo()
-
-              Image {
-                id: hancoreSupportIcon
-                anchors.centerIn: parent
-                width: root.supportGlyphSize
-                height: root.supportGlyphSize
-                source: Qt.resolvedUrl("assets/hancore-link.png")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-                layer.enabled: githubSupportButton.hot || githubSupportButton.activeFocus
-                layer.effect: MultiEffect {
-                  id: hancoreSupportHover
-                  colorization: 1
-                  colorizationColor: root.systemColors[3] || root.controlAccent
-                }
-              }
-            }
-
-            TokenButton {
-              id: kofiSupportButton
-              width: root.railIconWidth
-              height: Style.space(30)
-              borderless: true
-              accent: root.systemColors[3] || root.controlAccent
-              tooltipText: "Support HANCORE on Ko-fi"
-              accessibleName: tooltipText
-              focusable: true
-              horizontalPadding: Style.space(2)
-              verticalPadding: Style.space(2)
-              onClicked: root.openKoFi()
-
-              Image {
-                id: kofiSupportIcon
-                anchors.centerIn: parent
-                width: root.supportGlyphSize
-                height: root.supportGlyphSize
-                source: Qt.resolvedUrl("assets/kofi-mono.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-                layer.enabled: kofiSupportButton.hot || kofiSupportButton.activeFocus
-                layer.effect: MultiEffect {
-                  id: kofiSupportHover
-                  colorization: 1
-                  colorizationColor: root.systemColors[3] || root.controlAccent
-                }
-              }
-            }
-          }
-        }
-
         Connections {
           target: omaq
           function onPendingChanged() {
             if (!omaq.pending)
               return
+            Qt.callLater(function() {
+              if (omaq.pending && chatSurface.isSurfaceOwner) {
+                root.open()
+                chatSurface.playSound()
+              }
+            })
             root.nicknameEditOpen = false
             if (!root.nicknameSubmitPending)
               nicknameField.text = omaq.selfNickname
@@ -3156,7 +3200,9 @@ BarWidget {
             if (correlated || helperFailure) {
               root.nicknameSubmitPending = false
               root.nicknameFeedbackRequest = correlated ? root.nicknameRequest : ""
-              root.nicknameFeedback = omaq.lastError === "unsupported"
+              root.nicknameFeedback = omaq.lastError === "identity_setup_failed"
+                ? (omaq.deviceFeedback || "Identity setup failed. Try again.")
+                : omaq.lastError === "unsupported"
                 ? "Nickname update is unavailable."
                 : omaq.lastError === "nickname_invalid"
                   ? "Nickname must contain 1–18 valid characters."
@@ -3171,126 +3217,13 @@ BarWidget {
         }
 
         Rectangle {
-          id: actionRail
-          anchors.top: parent.top
-          anchors.topMargin: root.pad + heroVisual.height + root.panelSectionGap
-          anchors.right: parent.right
-          anchors.rightMargin: root.pad
-          implicitWidth: railColumns.implicitWidth + root.framePadding * 2
-          implicitHeight: railColumns.implicitHeight + root.framePadding * 2
-          width: implicitWidth
-          height: root.basePrimaryAreaHeight
-          radius: root.themedRadius(height)
-          color: "transparent"
-          border.color: root.controlBorder
-          border.width: 1
-          z: 20
-
-          Row {
-            id: railColumns
-            anchors.centerIn: parent
-            spacing: 0
-
-            Column {
-            spacing: Style.space(2)
-
-            RailIcon {
-              visible: !omaq.locked
-              materialIcon: "qr_code_2"
-              label: "Invite"
-              selected: root.inviteOpen
-              onClicked: root.toggleInvite()
-            }
-            RailIcon {
-              visible: !omaq.locked
-              materialIcon: "person_add"
-              label: "Add contact"
-              selected: root.showJoin
-              onClicked: root.toggleJoin()
-            }
-            RailIcon {
-              visible: !omaq.locked
-              materialIcon: "chat"
-              label: "Open chat"
-              selected: root.chatPickerOpen
-              onClicked: root.openChat()
-            }
-            RailIcon {
-              visible: !omaq.locked
-              materialIcon: "groups"
-              label: "Groups"
-              selected: root.moreOpen && root.moreSection === "groups"
-              onClicked: root.openRailAdvanced("groups")
-            }
-            RailIcon {
-              materialIcon: "shield"
-              label: "Safety code"
-              selected: root.moreOpen && root.moreSection === "chat"
-              fillSelected: false
-              onClicked: root.openRailAdvanced("chat")
-            }
-            RailIcon {
-              materialIcon: "format_size"
-              label: "Chat message size"
-              selected: root.settingsOpen && root.fontSizeOpen
-              onClicked: root.openRailFontSize()
-            }
-          }
-
-          Column {
-            spacing: Style.space(2)
-
-            RailIcon {
-              materialIcon: "palette"
-              label: "Theme"
-              selected: root.settingsOpen && root.themeOpen
-              onClicked: root.openRailTheme()
-            }
-            RailIcon {
-              materialIcon: "music_note"
-              label: "Sounds"
-              selected: root.settingsOpen && root.soundOpen
-              onClicked: root.openRailSounds()
-            }
-            RailIcon {
-              materialIcon: "science"
-              label: "Demo"
-              selected: chatSurface && chatSurface.demoOpen
-              onClicked: root.openDemo()
-            }
-            RailIcon {
-              materialIcon: chatSurface && chatSurface.muted
-                ? "notifications_off" : "notifications"
-              label: chatSurface && chatSurface.muted ? "Unmute" : "Mute"
-              selected: chatSurface && chatSurface.muted
-              onClicked: if (chatSurface) chatSurface.toggleMute()
-            }
-              RailIcon {
-                materialIcon: "warning_amber"
-                label: "Danger zone"
-                selected: root.moreOpen && root.moreSection === "danger"
-                fillSelected: false
-                onClicked: root.openRailAdvanced("danger")
-              }
-              RailIcon {
-                materialIcon: "badge"
-                label: "Identity"
-                selected: root.moreOpen && root.moreSection === "identity"
-                fillSelected: false
-                onClicked: root.openRailAdvanced("identity")
-              }
-            }
-          }
-        }
-
-        Rectangle {
           id: activeMenuFrame
           visible: root.primaryMenuOpen
           anchors.top: parent.top
           anchors.topMargin: root.pad + heroVisual.height + root.panelSectionGap
           anchors.left: parent.left
           anchors.leftMargin: root.pad
-          width: heroVisual.width
+          width: panelScroll.width
           height: panelScroll.height
           radius: root.themedRadius(height)
           color: "transparent"
@@ -3319,7 +3252,7 @@ BarWidget {
           Controls.ScrollBar.vertical: Controls.ScrollBar {
             id: panelScrollbar
             anchors.right: parent.right
-            anchors.rightMargin: root.railWidth + root.panelSectionGap
+            anchors.rightMargin: 0
             visible: panelScroll.contentHeight > panelScroll.height + 1
             policy: visible ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
             width: Style.space(3)
@@ -3337,7 +3270,6 @@ BarWidget {
             height: Math.max(panelScroll.height, column.implicitHeight)
             acceptedButtons: Qt.LeftButton
             onClicked: {
-              root.dismissTransientSections()
               panelFocus.forceActiveFocus()
             }
           }
@@ -3346,390 +3278,431 @@ BarWidget {
             id: column
             x: root.primaryMenuOpen ? root.framePadding : 0
             y: root.primaryMenuOpen ? root.framePadding : 0
-            width: Math.max(0, panelScroll.width - root.railWidth -
-                            root.panelSectionGap -
+            width: Math.max(0, panelScroll.width -
                             (root.primaryMenuOpen ? root.framePadding * 2 : 0))
             spacing: root.panelSectionGap
 
-          GridLayout {
-            id: heroActions
-            visible: false
-            width: parent.width
-            columns: 3
-            columnSpacing: root.btnGap
-            rowSpacing: Style.space(6)
-            readonly property real actionWidth: Math.max(0,
-              (width - columnSpacing * (columns - 1)) / columns)
-
-            ActionButton {
-              visible: !omaq.locked
-              Layout.fillWidth: true
-              Layout.preferredWidth: heroActions.actionWidth
-              iconText: "qr_code_2"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Invite"
-              selected: root.inviteOpen
-              onClicked: root.toggleInvite()
-            }
-            ActionButton {
-              visible: !omaq.locked
-              Layout.fillWidth: true
-              Layout.preferredWidth: heroActions.actionWidth
-              iconText: "person_add"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Add"
-              selected: root.showJoin
-              onClicked: root.toggleJoin()
-            }
-            ActionButton {
-              visible: !omaq.locked
-              Layout.fillWidth: true
-              Layout.preferredWidth: heroActions.actionWidth
-              iconText: "chat"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Chat"
-              selected: root.chatPickerOpen
-              onClicked: root.openChat()
-            }
-            ActionButton {
-              Layout.columnSpan: 3
-              Layout.fillWidth: true
-              iconText: "settings"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Settings"
-              selected: root.settingsOpen
-              onClicked: root.toggleSettings()
-            }
-          }
-
-          GridLayout {
-            id: settingsActions
-            visible: false
-            width: parent.width
-            columns: 2
-            columnSpacing: root.btnGap
-            rowSpacing: Style.space(6)
-            readonly property real actionWidth: Math.max(0, (width - columnSpacing) / columns)
-
-            ActionButton {
-              Layout.fillWidth: true
-              Layout.preferredWidth: settingsActions.actionWidth
-              iconText: "science"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Demo"
-              selected: chatSurface && chatSurface.demoOpen
-              onClicked: root.openDemo()
-            }
-            ActionButton {
-              Layout.fillWidth: true
-              Layout.preferredWidth: settingsActions.actionWidth
-              iconText: "palette"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Theme"
-              selected: root.themeOpen
-              accent: root.chatTheme === "system" ? Color.accent : Model.themeFor(root.chatTheme).accent
-              onClicked: root.toggleThemeSettings()
-            }
-            ActionButton {
-              Layout.fillWidth: true
-              Layout.preferredWidth: settingsActions.actionWidth
-              iconText: chatSurface && chatSurface.muted ? "notifications_off" : "notifications"
-              iconFontFamily: "Material Symbols Rounded"
-              text: chatSurface && chatSurface.muted ? "Unmute" : "Mute"
-              tooltipText: "Mute notification sound"
-              selected: chatSurface && chatSurface.muted
-              onClicked: if (chatSurface) chatSurface.toggleMute()
-            }
-            ActionButton {
-              Layout.fillWidth: true
-              Layout.preferredWidth: settingsActions.actionWidth
-              iconText: "music_note"
-              iconFontFamily: "Material Symbols Rounded"
-              text: "Sounds"
-              selected: root.soundOpen
-              onClicked: root.toggleSoundSettings()
-            }
+          ActionButton {
+            visible: root.primaryMenuOpen && !omaq.locked
+            text: root.settingsPage !== "" ? "Back to Settings" : "Back to conversations"
+            borderless: true
+            onClicked: root.settingsPage !== "" ? root.openSettingsPage("") : root.dismissTransientSections()
           }
 
           Column {
-            visible: root.chatPickerOpen
+            visible: root.addOpen
             width: parent.width
-            spacing: Style.space(6)
-
+            spacing: root.btnGap
             PanelSectionHeader {
-              text: "CHAT WITH"
+              text: "Add someone"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
-
-            SafeText {
-              visible: !omaq.friends || omaq.friends.length === 0
+            ActionButton {
               width: parent.width
-              text: "No contacts yet. Use Invite or Join first."
+              text: "Share a one-use invite"
+              onClicked: root.toggleInvite()
+            }
+            SafeText {
+              width: parent.width
+              text: omaq.inviteUrl !== "" ? (omaq.inviteBearer
+                ? "Your current link lets its holder add you once."
+                : "Your current link requires your approval.")
+                : omaq.supportsBearerInvites && !root.inviteRequireApproval
+                ? "Anyone with your link can add you once. Share it privately."
+                : "You will review the request before connecting."
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
               wrapMode: Text.WordWrap
             }
+            ActionButton {
+              visible: omaq.supportsBearerInvites
+              width: parent.width
+              enabled: omaq.inviteUrl === "" && !root.inviteActionPending
+              text: (omaq.inviteUrl !== "" ? !omaq.inviteBearer : root.inviteRequireApproval)
+                ? "Require my approval: On" : "Require my approval: Off"
+              onClicked: root.inviteRequireApproval = !root.inviteRequireApproval
+            }
+            ActionButton {
+              width: parent.width
+              text: "Use an invite"
+              onClicked: root.toggleJoin()
+            }
+            ActionButton {
+              width: parent.width
+              text: "Create a group"
+              onClicked: root.openRailAdvanced("groups")
+            }
+          }
 
+          Column {
+            visible: root.settingsOpen && root.settingsPage === ""
+            width: parent.width
+            spacing: Style.space(2)
+            PanelSectionHeader { text: "Settings"; foreground: root.foreground; fontFamily: root.fontFamily }
+            SettingsRow { label: "Profile"; value: omaq.selfNickname || "Choose your name"
+              onClicked: root.openSettingsPage("profile") }
+            SettingsRow { label: "Devices"; value: "This computer and your linked computers"
+              onClicked: root.openSettingsPage("devices") }
+            SettingsRow { label: "Notifications"; value: omaq.muted ? "Sounds muted" : "Sounds on"
+              onClicked: root.openSettingsPage("notifications") }
+            SettingsRow { label: "Appearance"; value: "Theme and message size"
+              onClicked: root.openSettingsPage("appearance") }
+            SettingsRow { label: "Recovery"; value: "Back up or restore this computer"
+              onClicked: root.openSettingsPage("recovery") }
+            PanelSeparator { foreground: root.foreground }
+            TokenButton { text: "Advanced"; borderless: true; focusable: true
+              onClicked: root.openSettingsPage("advanced") }
+          }
+
+          Column {
+            visible: root.settingsOpen && root.settingsPage === "profile"
+            width: parent.width; spacing: root.btnGap
+            PanelSectionHeader { text: "Profile"; foreground: root.foreground; fontFamily: root.fontFamily }
+            SafeText {
+              width: parent.width; text: "The name and picture your friends see."
+              color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            SettingsRow { label: "Name"; value: omaq.selfNickname || "Choose your name"
+              onClicked: { root.nicknameEditOpen = true; nicknameField.forceActiveFocus() } }
+            SettingsRow { label: "Picture"; value: "Choose a photo"
+              onClicked: root.pickSelfAvatar() }
+          }
+
+          Column {
+            visible: root.devicesOpen
+            width: parent.width
+            spacing: root.btnGap
+            PanelSectionHeader {
+              text: "Devices"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+            SafeText {
+              width: parent.width
+              visible: !omaq.supportsDeviceManagement || omaq.deviceFeedback !== ""
+              text: !omaq.supportsDeviceManagement ? "Update Harbor to manage linked devices."
+                : omaq.deviceFeedback
+              color: omaq.deviceFeedbackError ? root.urgent : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            SafeText {
+              width: parent.width
+              text: omaq.linkedDevices.length === 0 ? "You’re using Harbor on this computer. Add another computer to use the same profile there." : "Computers connected to your profile."
+              color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            ActionButton {
+              visible: omaq.selfNickname !== "" && omaq.supportsBearerInvites && !omaq.deviceLink && !omaq.deviceBootstrap
+              width: parent.width
+              text: root.prepareDeviceInviteRequest !== "" ? "Preparing…" : "Add a computer"
+              enabled: omaq.deviceRequest === "" && root.prepareDeviceInviteRequest === ""
+              onClicked: root.addComputer()
+            }
+            SafeText {
+              visible: !!omaq.deviceBootstrap
+              width: parent.width
+              text: "Connecting to your other computer… Keep Harbor open on both computers."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            Column {
+              visible: omaq.selfNickname === "" && omaq.supportsDeviceManagement && omaq.linkedDevices.length === 0 &&
+                !omaq.deviceLink && !omaq.deviceBootstrap && root.deviceSetupChoice === ""
+              width: parent.width
+              spacing: root.btnGap
+              ActionButton {
+                width: parent.width
+                text: "Start a new profile"
+                enabled: omaq.deviceRequest === ""
+                onClicked: root.deviceSetupChoice = "create"
+              }
+              ActionButton {
+                width: parent.width
+                text: "Use my existing profile"
+                enabled: omaq.deviceRequest === ""
+                onClicked: root.deviceSetupChoice = "link"
+              }
+            }
+            TokenTextField {
+              id: deviceNameField
+              visible: omaq.supportsDeviceManagement && omaq.linkedDevices.length === 0 && !omaq.deviceLink && !omaq.deviceBootstrap && root.deviceSetupChoice !== ""
+              width: parent.width
+              height: Style.space(32)
+              placeholderText: "Name this computer"
+              text: "My computer"
+              maximumLength: 47
+            }
+            ActionButton {
+              visible: deviceNameField.visible && root.deviceSetupChoice === "create"
+              width: parent.width
+              text: "Continue"
+              enabled: deviceNameField.text.trim() !== "" && omaq.deviceRequest === "" && !omaq.deviceLink
+              onClicked: omaq.manageDevice("device.initialize", deviceNameField.text.trim(), "", false)
+            }
+            TokenTextField {
+              id: deviceInviteField
+              visible: deviceNameField.visible && root.deviceSetupChoice === "link"
+              width: parent.width
+              height: Style.space(32)
+              placeholderText: "Paste a device-link invite"
+              maximumLength: 511
+            }
+            ActionButton {
+              visible: deviceInviteField.visible
+              width: parent.width
+              text: "Link this computer"
+              enabled: deviceNameField.text.trim() !== "" && deviceInviteField.text.trim() !== ""
+              onClicked: omaq.beginDeviceLink(deviceInviteField.text, deviceNameField.text)
+            }
+            SafeText {
+              width: parent.width
+              visible: deviceInviteField.visible && !omaq.deviceLink
+              text: "On your existing computer, open Settings → Devices → Add a computer. Paste its link here, then approve on that computer."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            SafeText {
+              visible: omaq.deviceLinkError !== "" || !!omaq.deviceLink
+              width: parent.width
+              text: omaq.deviceLinkError !== "" ? omaq.deviceLinkError
+                : !omaq.deviceLink ? "" : omaq.deviceLink.state === "linked"
+                  ? (omaq.deviceLink.incoming ? "“" + omaq.deviceLink.name + "” is linked." : "This computer is linked.")
+                : omaq.deviceLink.state === "sent" ? "Device authorization sent. Check the new computer."
+                : omaq.deviceLink.state === "declined" ? "Device linking declined."
+                : !omaq.deviceLink.incoming && omaq.deviceLink.state === "waiting-for-owner"
+                  ? "Compare this code on your existing computer and approve the link there."
+                : (omaq.deviceLink.state === "requested" || omaq.deviceLink.state === "verify")
+                  ? "Link “" + omaq.deviceLink.name + "”? Compare the complete code on both computers. Continue only if they match. Only approve a computer you own."
+                  : "Waiting for the other computer…"
+              color: omaq.deviceLinkError !== "" ? root.urgent : root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            SafeText {
+              visible: !!omaq.deviceLink && omaq.deviceLink.code !== "" &&
+                ["requested", "verify", "working", "waiting-for-device", "waiting-for-owner"].indexOf(omaq.deviceLink.state) >= 0
+              width: parent.width
+              text: omaq.deviceLink ? (omaq.deviceLink.code.match(/.{1,8}/g) || []).join(" ") : ""
+              color: root.controlAccent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WrapAnywhere
+            }
+            ActionButton {
+              visible: !!omaq.deviceLink && (omaq.deviceLink.state === "requested" || omaq.deviceLink.state === "verify")
+              width: parent.width
+              text: "Approve this computer"
+              onClicked: omaq.decideDeviceLink(true)
+            }
+            ActionButton {
+              visible: !!omaq.deviceLink && omaq.deviceLink.incoming && omaq.deviceLink.state === "requested"
+              text: "Decline"
+              onClicked: omaq.decideDeviceLink(false)
+            }
+            ActionButton {
+              visible: !!omaq.deviceLink && ["linked", "sent", "declined"].indexOf(omaq.deviceLink.state) >= 0
+              text: "Done"
+              onClicked: omaq.deviceLink = null
+            }
             Repeater {
-              model: omaq.friends
+              model: omaq.linkedDevices
               delegate: ActionButton {
                 required property var modelData
                 width: parent ? parent.width : 0
-                text: {
-                  var name = modelData && modelData.name
-                    ? String(modelData.name)
-                    : ("Friend " + (modelData ? modelData.id : ""))
-                  return name + " · " + root.friendStatus(modelData)
+                text: modelData.name + (modelData.current ? " · This device"
+                  : modelData.active ? " · Remove" : " · Removed")
+                enabled: modelData.active && !modelData.current && omaq.deviceRequest === ""
+                onClicked: {
+                  root.deviceRevokeKey = String(modelData.key)
+                  root.deviceRevokeName = String(modelData.name)
                 }
-                focusable: true
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                onClicked: root.openFriend(modelData ? modelData.id : "",
-                  modelData ? modelData.name : "")
               }
+            }
+            SafeText {
+              visible: root.deviceRevokeKey !== ""
+              width: parent.width
+              text: "Remove “" + root.deviceRevokeName + "”? It will lose future access after other devices learn of the removal. Existing copies remain on that computer."
+              color: root.urgent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+            Row {
+              visible: root.deviceRevokeKey !== ""
+              spacing: root.btnGap
+              ActionButton {
+                text: "Cancel"
+                onClicked: root.deviceRevokeKey = ""
+              }
+              ActionButton {
+                text: "Remove device"
+                enabled: omaq.deviceRequest === ""
+                onClicked: {
+                  if (omaq.manageDevice("device.revoke", "", root.deviceRevokeKey, true))
+                    root.deviceRevokeKey = ""
+                }
+              }
+            }
+            ActionButton {
+              visible: omaq.supportsDeviceManagement
+              text: "Refresh"
+              enabled: omaq.deviceRequest === ""
+              onClicked: omaq.manageDevice("device.status", "", "", false)
             }
           }
 
-          Rectangle {
+          Column {
             id: identityContactsFrame
             visible: !root.primaryMenuOpen
             width: parent.width
-            implicitHeight: identityContactsColumn.implicitHeight + root.framePadding * 2
-            height: root.basePrimaryAreaHeight
-            radius: root.themedRadius(height)
-            color: "transparent"
-            border.color: root.controlBorder
-            border.width: 1
+            spacing: root.btnGap
 
-            Column {
-              id: identityContactsColumn
-              anchors.fill: parent
-              anchors.margins: root.framePadding
-              spacing: Style.space(6)
-
-            Item {
-              id: contactsFrame
-              visible: (omaq.friends && omaq.friends.length > 0) ||
-                (omaq.groups && omaq.groups.length > 0)
+            ActionButton {
+              visible: omaq.selfNickname === ""
               width: parent.width
-              implicitHeight: contactsColumn.implicitHeight
-              height: implicitHeight
-
-              Column {
-                id: contactsColumn
-                anchors.fill: parent
-                spacing: Style.space(4)
-
-            SafeText {
-              visible: omaq.friends && omaq.friends.length > 0
-              text: "FRIENDS · " + root.onlineFriendCount() + "/" +
-                (omaq.friends ? omaq.friends.length : 0)
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              font.letterSpacing: 1.2
-            }
-
-            GridView {
-              id: friendsGrid
-              visible: omaq.friends && omaq.friends.length > 0
-              width: parent.width
-              height: visible ? Math.min(contentHeight, Style.space(24) * 5) : 0
-              clip: true
-              boundsBehavior: Flickable.StopAtBounds
-              flow: GridView.FlowLeftToRight
-              readonly property int columnCount: Math.max(1, Math.min(2,
-                Math.floor(Math.max(1, width) / Style.space(170))))
-              cellWidth: width / columnCount
-              cellHeight: Style.space(24)
-              model: root.orderedFriendCells(columnCount)
-
-              delegate: Item {
-                  id: friendDelegate
-                  required property var modelData
-                  required property int index
-                  width: friendsGrid.cellWidth
-                  height: friendsGrid.cellHeight
-                  visible: !!modelData
-                  readonly property int unreadCount: omaq.unreadFor(
-                    modelData ? modelData.id : "")
-                  activeFocusOnTab: true
-                  HoverHandler { id: friendHover }
-                  onActiveFocusChanged: if (activeFocus)
-                    friendsGrid.positionViewAtIndex(index, GridView.Contain)
-                  Accessible.role: Accessible.Button
-                  Accessible.name: friendName.text + " · " + root.friendStatus(friendDelegate.modelData) +
-                    (friendDelegate.unreadCount > 0
-                      ? " · " + friendDelegate.unreadCount + " unread messages" : "")
-                  Accessible.onPressAction: root.openFriend(friendDelegate.modelData ? friendDelegate.modelData.id : "",
-                    friendDelegate.modelData ? friendDelegate.modelData.name : "")
-                  Keys.onReturnPressed: root.openFriend(friendDelegate.modelData ? friendDelegate.modelData.id : "",
-                    friendDelegate.modelData ? friendDelegate.modelData.name : "")
-                  Keys.onEnterPressed: root.openFriend(friendDelegate.modelData ? friendDelegate.modelData.id : "",
-                    friendDelegate.modelData ? friendDelegate.modelData.name : "")
-
-                  Rectangle {
-                    id: friendStatusDot
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Style.space(6)
-                    height: width
-                    radius: width / 2
-                    color: root.friendStatusDotColor(friendDelegate.modelData)
-                    border.width: 0
-                  }
-
-                  SafeText {
-                    id: friendName
-                    anchors.left: friendStatusDot.right
-                    anchors.leftMargin: Style.space(6)
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    text: {
-                      var friend = friendDelegate.modelData
-                      return friend && friend.name
-                        ? String(friend.name) : ("Friend " + (friend ? friend.id : ""))
-                    }
-                    color: friendHover.hovered || friendDelegate.activeFocus
-                      ? (root.systemColors[3] || root.controlAccent)
-                      : root.friendStatusColor(friendDelegate.modelData)
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: friendDelegate.modelData && friendDelegate.modelData.online
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                  }
-
-                  Rectangle {
-                    visible: friendDelegate.unreadCount > 0
-                    x: friendName.x
-                    y: friendName.y + (friendName.height + friendName.paintedHeight) / 2 +
-                      Style.space(1)
-                    width: Math.min(friendName.width, friendName.paintedWidth)
-                    height: Math.max(1, Style.space(1))
-                    color: root.systemColors[3]
-                    radius: height / 2
-                  }
-
-                  MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.openFriend(friendDelegate.modelData ? friendDelegate.modelData.id : "",
-                      friendDelegate.modelData ? friendDelegate.modelData.name : "")
-                  }
-                }
-
-              Controls.ScrollBar.vertical: Controls.ScrollBar {
-                id: friendsScrollbar
-                visible: friendsGrid.contentHeight > friendsGrid.height + 1
-                policy: visible ? Controls.ScrollBar.AlwaysOn : Controls.ScrollBar.AlwaysOff
-                width: Style.space(3)
-                opacity: friendsGrid.moving || hovered ? 0.5 : 0.14
-                Behavior on opacity { NumberAnimation { duration: 180 } }
-                contentItem: Rectangle {
-                  implicitWidth: Style.space(2)
-                  radius: width / 2
-                  color: root.dim
-                }
-                background: Item {}
+              text: "Use Harbor from another computer"
+              onClicked: {
+                root.dismissTransientSections()
+                root.devicesOpen = true
+                root.deviceSetupChoice = "link"
+                omaq.manageDevice("device.status", "", "", false)
               }
             }
-
             SafeText {
-              visible: omaq.groups && omaq.groups.length > 0
-              text: "GROUPS"
-              color: root.dim
+              visible: omaq.selfNickname === ""
+              width: parent.width
+              text: "Welcome to Harbor. Choose a nickname above to get started."
+              color: root.foreground
               font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              font.letterSpacing: 1.2
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
+            ActionButton {
+              visible: omaq.selfNickname === ""
+              text: "Restore a backup"
+              onClicked: root.openSettingsPage("recovery")
+            }
+            TokenTextField {
+              id: conversationSearch
+              width: parent.width
+              height: Style.space(32)
+              placeholderText: "Find a conversation"
+              onTextChanged: root.conversationQuery = text
             }
 
-            Column {
-              visible: omaq.groups && omaq.groups.length > 0
+            SafeText {
+              visible: conversationList.count === 0
               width: parent.width
-              spacing: Style.space(2)
+              text: !omaq.friendsReady ? "Loading conversations…"
+                : root.conversationQuery !== "" ? "No matching conversations"
+                : "Your people, within reach. Add someone to start a conversation."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
 
-              Repeater {
-                model: omaq.groups || []
-                delegate: Item {
-                  id: activeGroupDelegate
-                  required property var modelData
-                  width: parent ? parent.width : 0
-                  height: Style.space(24)
-                  activeFocusOnTab: true
-                  readonly property int displayedMemberCount: Math.max(
-                    Number(modelData && modelData.memberCount || 0),
-                    modelData && modelData.members ? modelData.members.length : 0)
-                  Accessible.role: Accessible.Button
-                  Accessible.name: activeGroupName.text + ", " +
-                    displayedMemberCount + (displayedMemberCount === 1 ? " member" : " members")
-                  Accessible.onPressAction: root.openGroup(modelData ? modelData.id : "")
-                  Keys.onReturnPressed: root.openGroup(modelData ? modelData.id : "")
-                  Keys.onEnterPressed: root.openGroup(modelData ? modelData.id : "")
-
+            ListView {
+              id: conversationList
+              width: parent.width
+              height: Math.min(count * Style.space(56), Style.space(320))
+              clip: true
+              boundsBehavior: Flickable.StopAtBounds
+              model: root.conversationRows()
+              delegate: Rectangle {
+                id: conversationRow
+                required property var modelData
+                required property int index
+                width: conversationList.width
+                height: Style.space(56)
+                radius: root.controlRadius
+                color: conversationHover.hovered || activeFocus ? root.controlHoverFill : "transparent"
+                activeFocusOnTab: true
+                readonly property int unread: omaq.unreadFor(modelData.id)
+                readonly property var preview: omaq.conversationPreview(modelData.id, modelData.key)
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.name + ", " + modelData.status +
+                  (unread > 0 ? ", " + unread + " unread" : "")
+                Accessible.onPressAction: root.openConversation(modelData)
+                Keys.onReturnPressed: root.openConversation(modelData)
+                Keys.onEnterPressed: root.openConversation(modelData)
+                Keys.onSpacePressed: root.openConversation(modelData)
+                onActiveFocusChanged: if (activeFocus)
+                  conversationList.positionViewAtIndex(index, ListView.Contain)
+                HoverHandler { id: conversationHover }
+                AvatarPic {
+                  id: conversationAvatar
+                  anchors.left: parent.left
+                  anchors.leftMargin: root.framePadding
+                  anchors.verticalCenter: parent.verticalCenter
+                  px: Style.space(34)
+                  path: conversationRow.modelData.avatar
+                  online: conversationRow.modelData.online
+                  revision: omaq.avatarTick
+                  onClicked: root.openConversation(conversationRow.modelData)
+                }
+                Column {
+                  anchors.left: conversationAvatar.right
+                  anchors.leftMargin: Style.space(8)
+                  anchors.right: activityInfo.left
+                  anchors.rightMargin: Style.space(8)
+                  anchors.verticalCenter: parent.verticalCenter
                   SafeText {
-                    id: activeGroupIcon
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: Harbor.MaterialSymbols.glyph("groups")
-                    color: root.systemColors[3] || root.controlAccent
-                    font.family: Harbor.MaterialSymbols.family
-                    font.pixelSize: Style.font.icon
-                    font.variableAxes: ({ "FILL": activeGroupDelegate.activeFocus ? 1 : 0,
-                                          "wght": 500 })
-                  }
-
-                  SafeText {
-                    id: activeGroupName
-                    anchors.left: activeGroupIcon.right
-                    anchors.leftMargin: Style.space(6)
-                    anchors.right: activeGroupCount.left
-                    anchors.rightMargin: Style.space(8)
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    text: {
-                      var group = activeGroupDelegate.modelData
-                      var name = group && group.title ? String(group.title) : "Group"
-                      var unread = omaq.unreadFor(group ? group.id : "")
-                      return unread > 0 ? name + " · " + unread : name
-                    }
+                    width: parent.width
+                    text: conversationRow.modelData.name
                     color: root.foreground
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.body
-                    font.bold: true
-                    verticalAlignment: Text.AlignVCenter
+                    font.bold: conversationRow.unread > 0
                     elide: Text.ElideRight
                   }
-
                   SafeText {
-                    id: activeGroupCount
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: String(activeGroupDelegate.displayedMemberCount)
+                    width: parent.width
+                    text: conversationRow.preview.text || conversationRow.modelData.status
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
-                    font.features: ({ "tnum": 1 })
-                  }
-
-                  MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.openGroup(activeGroupDelegate.modelData
-                      ? activeGroupDelegate.modelData.id : "")
+                    elide: Text.ElideRight
                   }
                 }
+                Column {
+                  id: activityInfo
+                  anchors.right: parent.right
+                  anchors.rightMargin: root.framePadding
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(2)
+                  SafeText {
+                    text: root.activityTime(conversationRow.preview.ts)
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                  SafeText {
+                    anchors.right: parent.right
+                    text: conversationRow.unread > 0 ? String(conversationRow.unread) : ""
+                    color: root.controlAccent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.openConversation(conversationRow.modelData)
+                }
               }
+              Controls.ScrollBar.vertical: Controls.ScrollBar {}
             }
-              }
-            }
-          }
           }
 
           Column {
@@ -3738,7 +3711,7 @@ BarWidget {
             spacing: Style.space(6)
 
             PanelSectionHeader {
-              text: "CHAT MESSAGE SIZE"
+              text: "Message size"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -3808,7 +3781,7 @@ BarWidget {
 
             SafeText {
               width: parent.width
-              text: "Applies to chat and Demo windows; the panel follows the Omarchy palette."
+              text: "Chat theme. The panel follows your desktop theme."
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -3871,8 +3844,22 @@ BarWidget {
             width: parent.width
             spacing: Style.space(6)
 
+            SettingsRow {
+              label: "Message sounds"; value: omaq.muted ? "Off" : "On"
+              onClicked: chatSurface.toggleMute()
+            }
+            ActionButton {
+              text: "Test sound"; enabled: !omaq.muted
+              onClicked: chatSurface.previewSound(root.notificationSound)
+            }
+            SafeText {
+              visible: chatSurface.soundWarning !== "" || chatSurface.notificationWarning !== ""
+              width: parent.width; text: chatSurface.soundWarning || chatSurface.notificationWarning
+              color: root.urgent; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
             PanelSectionHeader {
-              text: "NOTIFICATION SOUND"
+              text: "Sound"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -3920,10 +3907,10 @@ BarWidget {
 
             ActionButton {
               width: parent.width
-              text: soundPick.running ? "Choosing sound…" : "Import sound"
+              text: soundPick.visible ? "Choosing sound…" : "Import sound"
               iconText: "audio_file"
               iconFontFamily: "Material Symbols Rounded"
-              enabled: omaq.supportsCustomSounds && !soundPick.running &&
+              enabled: omaq.supportsCustomSounds && !soundPick.visible &&
                 root.soundActionRequest === ""
               onClicked: root.startSoundPicker()
             }
@@ -4020,7 +4007,7 @@ BarWidget {
                 text: "Show contacts"
                 iconText: "manage_accounts"
                 iconFontFamily: "Material Symbols Rounded"
-                onClicked: root.dismissTransientSections()
+                onClicked: panelFocus.forceActiveFocus()
               }
 
               ActionButton {
@@ -4326,6 +4313,13 @@ BarWidget {
               spacing: Style.space(8)
 
               PanelSectionHeader {
+                visible: root.deviceInviteMode
+                text: "LINK A COMPUTER"
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+              }
+              PanelSectionHeader {
+                visible: !root.deviceInviteMode
                 text: "YOUR INVITE"
                 foreground: root.foreground
                 fontFamily: root.fontFamily
@@ -4374,7 +4368,14 @@ BarWidget {
 
                 Repeater {
                   id: inviteStepsRepeater
-                  model: [
+                  model: root.deviceInviteMode ? [
+                    { number: "1", text: "Keep this link private. Its holder can connect once, but cannot join your identity without your confirmation." },
+                    { number: "2", text: "On the new computer, choose Link my existing identity and paste this link." },
+                    { number: "3", text: "Compare the code shown on both computers, then confirm the link." }
+                  ] : omaq.inviteBearer ? [
+                    { number: "1", text: "Share privately. Anyone with this link can add you once." },
+                    { number: "2", text: "They add you and the conversation is ready." }
+                  ] : [
                     { number: "1", text: "Send the link or QR through a trusted channel" },
                     { number: "2", text: "They redeem the invite once" },
                     { number: "3", text: "Verify and accept the request" }
@@ -4525,7 +4526,7 @@ BarWidget {
                 id: redeemField
                 width: parent.width
                 foreground: root.controlForeground
-                placeholderText: "Paste omaq:// invite"
+                placeholderText: "Paste an invite link"
                 text: root.redeemDraft
                 enabled: root.redeemRequest === ""
                 onTextEdited: {
@@ -5022,7 +5023,7 @@ BarWidget {
 
               PanelSectionHeader {
                 visible: root.moreSection === "identity"
-                text: "IDENTITY"
+                text: "Recovery"
                 foreground: root.foreground
                 fontFamily: root.fontFamily
               }
@@ -5030,7 +5031,7 @@ BarWidget {
               SafeText {
                 visible: root.moreSection === "identity"
                 width: parent.width
-                text: omaq.saveProtected ? "Identity file protected" : "Passphrase not set"
+                text: omaq.saveProtected ? "This computer’s backup is password-protected." : "This computer’s backup is not password-protected."
                 color: omaq.saveProtected ? root.onlineStatusColor
                   : (root.systemColors[1] || root.dim)
                 font.family: root.fontFamily
@@ -5041,7 +5042,7 @@ BarWidget {
               SafeText {
                 visible: root.moreSection === "identity" && !omaq.supportsIdentityActions
                 width: parent.width
-                text: "Update the local Harbor helper before changing identity settings. Existing identity and contacts remain available."
+                text: "Update Harbor to use backups on this computer."
                 color: root.urgent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -5056,17 +5057,17 @@ BarWidget {
                 password: true
                 maximumLength: 128
                 placeholderText: omaq.saveProtected
-                  ? "Current or imported identity passphrase"
-                  : "New or imported identity passphrase"
+                  ? "Backup password"
+                  : "Password for a protected backup, if needed"
                 enabled: omaq.supportsIdentityActions && !root.identityActionPending
                 onTextEdited: if (!root.identityActionPending)
                   root.clearIdentityFeedback()
               }
 
               SafeText {
-                visible: root.moreSection === "identity" && !omaq.saveProtected
+                visible: root.moreSection === "identity" && root.recoveryDetailsOpen && !omaq.saveProtected
                 width: parent.width
-                text: "Use at least 8 characters and at most 128 bytes."
+                text: "For a new password, use 8–128 bytes."
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -5076,7 +5077,7 @@ BarWidget {
               SafeText {
                 visible: root.moreSection === "identity"
                 width: parent.width
-                text: "Validate bundle checks a bundle without changing this identity. Import identity activates it after confirmation."
+                text: "This backup saves this computer’s connection identity. It does not include chat history or linked-profile recovery. To add a computer, use Devices instead."
                 color: root.dim
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -5085,7 +5086,7 @@ BarWidget {
 
               TokenTextField {
                 id: importPath
-                visible: root.moreSection === "identity"
+                visible: false
                 width: parent.width
                 foreground: root.controlForeground
                 maximumLength: 511
@@ -5117,7 +5118,8 @@ BarWidget {
                   Layout.preferredHeight: root.actionButtonHeight
                   iconText: omaq.saveProtected ? "lock_open" : "lock"
                   iconFontFamily: "Material Symbols Rounded"
-                  text: omaq.saveProtected ? "Remove lock" : "Protect"
+                  text: omaq.saveProtected ? "Remove password" : "Set password"
+                  visible: root.recoveryDetailsOpen
                   focusable: true
                   enabled: omaq.supportsIdentityActions && !root.identityActionPending &&
                     (omaq.saveProtected
@@ -5133,7 +5135,7 @@ BarWidget {
                   Layout.preferredHeight: root.actionButtonHeight
                   iconText: "file_upload"
                   iconFontFamily: "Material Symbols Rounded"
-                  text: "Export"
+                  text: "Save backup"
                   focusable: true
                   enabled: omaq.supportsIdentityActions && !root.identityActionPending
                   onClicked: root.startIdentityPicker("export")
@@ -5145,7 +5147,8 @@ BarWidget {
                   Layout.preferredHeight: root.actionButtonHeight
                   iconText: "file_open"
                   iconFontFamily: "Material Symbols Rounded"
-                  text: "Validate bundle"
+                  text: "Check backup"
+                  visible: false
                   focusable: true
                   enabled: omaq.supportsIdentityActions && !root.identityActionPending
                   onClicked: {
@@ -5165,22 +5168,19 @@ BarWidget {
                   Layout.preferredHeight: root.actionButtonHeight
                   iconText: "published_with_changes"
                   iconFontFamily: "Material Symbols Rounded"
-                  text: "Import identity"
+                  text: "Restore backup"
                   focusable: true
                   accent: root.urgent
                   enabled: omaq.supportsIdentityActions && !root.identityActionPending
-                  onClicked: {
-                    var path = importPath.text.trim()
-                    if (path === "") {
-                      root.startIdentityPicker("replace")
-                    } else {
-                      root.replaceIdentityPath = path
-                      root.replaceIdentityConfirm = true
-                      root.identityFeedback = "Review the selected bundle before importing this identity."
-                      root.identityFeedbackError = false
-                    }
-                  }
+                  onClicked: root.startIdentityPicker("replace")
                 }
+              }
+
+              TokenButton {
+                visible: root.moreSection === "identity" && !root.replaceIdentityConfirm
+                text: root.recoveryDetailsOpen ? "Hide password settings" : "Password settings"
+                borderless: true; focusable: true
+                onClicked: root.recoveryDetailsOpen = !root.recoveryDetailsOpen
               }
 
               SafeText {
@@ -5197,7 +5197,7 @@ BarWidget {
               SafeText {
                 visible: root.moreSection === "identity" && root.replaceIdentityConfirm
                 width: parent.width
-                text: "Import " + root.replaceIdentityPath + " as the active identity? Existing direct contacts will require a fresh invite."
+                text: "Replace the profile on this computer with the checked backup? Your existing contacts will need new invites. This does not restore chat history."
                 color: root.urgent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -5227,6 +5227,7 @@ BarWidget {
                     root.replaceIdentityConfirm = false
                     root.replaceIdentityPath = ""
                     root.identityFeedback = ""
+                    root.restorePassword = ""
                     passField.text = ""
                   }
                 }
@@ -5237,7 +5238,7 @@ BarWidget {
                   Layout.preferredHeight: root.actionButtonHeight
                   iconText: "published_with_changes"
                   iconFontFamily: "Material Symbols Rounded"
-                  text: "Import identity now"
+                  text: "Restore backup"
                   focusable: true
                   accent: root.urgent
                   enabled: omaq.supportsIdentityActions && !root.identityActionPending &&
@@ -5246,7 +5247,8 @@ BarWidget {
                     var path = root.replaceIdentityPath
                     root.replaceIdentityConfirm = false
                     root.replaceIdentityPath = ""
-                    root.runIdentityAction("replace", path)
+                    root.runIdentityAction("replace", path, root.restorePassword)
+                    root.restorePassword = ""
                   }
                 }
               }

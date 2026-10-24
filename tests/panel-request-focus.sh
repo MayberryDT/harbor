@@ -34,8 +34,8 @@ for marker in required:
 layout_markers = [
     "readonly property int cardWidth: 400",
     "function orderedFriendCells(columnCount)",
-    "readonly property int columnCount: Math.max(1, Math.min(2,",
-    "model: root.orderedFriendCells(columnCount)",
+    "id: conversationList",
+    "model: root.conversationRows()",
     "id: inviteSteps",
     'text: "Send the link or QR through a trusted channel"',
     'text: "They redeem the invite once"',
@@ -49,7 +49,7 @@ if 'text: "You accept · the chat opens"' in panel:
 
 self_start = panel.index("id: selfHeaderContent")
 pending_start = panel.index("id: pendingRequestContent")
-support_start = panel.index("id: supportLinks", pending_start)
+support_start = panel.index("        Connections {", pending_start)
 self_block = panel[self_start:pending_start]
 pending_block = panel[pending_start:support_start]
 if "id: panelCloseButton" in panel or 'tooltipText: "Close panel"' in panel:
@@ -59,17 +59,10 @@ for forbidden in ('placeholderText: "Search this chat"', 'text: "Search"',
                   "omaq.searchItems", "root.searchMetaText("):
     if forbidden in panel:
         raise SystemExit(f"panel-request-focus: panel message search remains: {forbidden}")
-if 'label: "Safety code"' not in panel or 'text: "Show safety code"' not in panel:
+if 'text: "Verify a contact"' not in panel or 'text: "Show safety code"' not in panel:
     raise SystemExit("panel-request-focus: safety-code path was removed with message search")
 if '"FILL": railIcon.selected && railIcon.fillSelected ? 1 : 0' not in panel:
     raise SystemExit("panel-request-focus: rail icon fill binding changed")
-for icon, label in (("shield", "Safety code"), ("badge", "Identity")):
-    start = panel.index(f'materialIcon: "{icon}"')
-    end = panel.index("onClicked:", start)
-    if "fillSelected: false" not in panel[start:end]:
-        raise SystemExit(
-            f"panel-request-focus: {label} rail icon changes glyph fill when selected"
-        )
 if 'text: "YOU · " + root.connectionLabel().toUpperCase()' not in self_block:
     raise SystemExit("panel-request-focus: normal self status is missing")
 for forbidden in ("omaq.selfAvatar", "omaq.selfNickname", '"YOU · "'):

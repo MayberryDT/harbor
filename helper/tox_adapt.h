@@ -43,6 +43,9 @@ int omaq_tox_set_name(struct omaq_tox *t, const char *name);
 int omaq_tox_friend_pk_hex(struct omaq_tox *t, uint32_t friend_number, char *hex64);
 int omaq_tox_friend_add(struct omaq_tox *t, const char *addr_hex, const char *msg, uint32_t *fn_out);
 void omaq_tox_discard(struct omaq_tox *t);
+/* Explicit invitation takes over an unpinned provisional friendship. Caller
+ * must durably journal the verified invitation before using this operation. */
+int omaq_tox_friend_reinvite(struct omaq_tox *t,const char *addr_hex,const char *msg,uint32_t *fn_out);
 int omaq_tox_friend_accept(struct omaq_tox *t, const uint8_t *pk32);
 int omaq_tox_friend_delete(struct omaq_tox *t, uint32_t friend_number);
 uint32_t omaq_tox_friend_by_pk(struct omaq_tox *t, const uint8_t *pk32);

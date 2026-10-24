@@ -377,7 +377,7 @@ def describe(state: str, available: str, runtime=None, detail=None):
 def wait_new_runtime(state_dir: Path, helper_path: Path, expected: str,
                      old: Runtime, seconds=None) -> Runtime:
     if seconds is None:
-        seconds = float(os.environ.get("OMAQ_HELPER_RESTART_TIMEOUT", "45"))
+        seconds = float(os.environ.get("HARBOR_HELPER_RESTART_TIMEOUT") or os.environ.get("OMAQ_HELPER_RESTART_TIMEOUT", "45"))
         if seconds < 0.5 or seconds > 120:
             fail("invalid helper restart timeout")
     deadline = time.monotonic() + seconds
@@ -575,8 +575,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("status", "backup", "activate", "restore"))
     parser.add_argument("--root", default=str(Path(__file__).resolve().parent.parent))
-    parser.add_argument("--state", default=os.environ.get(
-        "OMAQ_STATE", str(Path.home() / ".local/state/omaq")))
+    parser.add_argument("--state", default=(os.environ.get("HARBOR_STATE") or os.environ.get(
+        "OMAQ_STATE", str(Path.home() / ".local/state/omaq"))))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--root-identity", default="")
     parser.add_argument("--expect-sha256", default="")
@@ -590,5 +590,5 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except (OSError, ValueError, UnicodeError, RuntimeError,
             json.JSONDecodeError) as error:
-        print(f"omaq-helper-runtime: {error}", file=sys.stderr)
+        print(f"harbor-helper-runtime: {error}", file=sys.stderr)
         raise SystemExit(1)

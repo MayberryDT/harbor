@@ -53,6 +53,8 @@ run_case() {
   rule_key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   mkdir -m 700 "$rule_dir"
   printf 'generation\n' >"$rule_dir/rules-v2.$rule_key"
+  printf 'generation\n' >"$rule_dir/rules-v3.$rule_key"
+  chmod 600 "$rule_dir/rules-v3.$rule_key"
   printf 'legacy generation\n' >"$rule_dir/rules.$rule_key"
   : >"$rule_dir/rules-v2.$rule_key.lock"
   : >"$rule_dir/rules.$rule_key.lock"

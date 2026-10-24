@@ -23,7 +23,7 @@ while (( $# > 0 )); do
     exit 0
     ;;
   *)
-    printf 'uninstall-omaq: unknown option: %s\n' "$1" >&2
+    printf 'uninstall-harbor: unknown option: %s\n' "$1" >&2
     usage >&2
     exit 2
     ;;
@@ -33,7 +33,7 @@ done
 
 if (( ! assume_yes )); then
   if [[ ! -t 0 || ! -t 1 ]]; then
-    echo "uninstall-omaq: refusing to continue without confirmation; pass --yes" >&2
+    echo "uninstall-harbor: refusing to continue without confirmation; pass --yes" >&2
     exit 1
   fi
   gum confirm "Remove the Harbor plugin? Data cleanup will be offered separately." || exit 1
@@ -41,10 +41,10 @@ fi
 
 plugin_root=$(unset CDPATH; cd -- "$(dirname -- "$0")/.." && pwd -P)
 omarchy_command=$(command -v omarchy) || {
-  echo "uninstall-omaq: omarchy command is unavailable" >&2
+  echo "uninstall-harbor: omarchy command is unavailable" >&2
   exit 1
 }
-state_dir=${OMAQ_STATE:-"$HOME/.local/state/omaq"}
+state_dir=${HARBOR_STATE:-${OMAQ_STATE:-"$HOME/.local/state/omaq"}}
 state_dir=${state_dir%/}
 uninstall_marker="$state_dir/omaq.uninstalling"
 cleanup_marker() {
@@ -91,9 +91,9 @@ helper, state_dir, marker_path, owner_text = sys.argv[1:]
 try:
     owner_pid = int(owner_text)
 except ValueError:
-    raise SystemExit("uninstall-omaq: invalid uninstall owner")
+    raise SystemExit("uninstall-harbor: invalid uninstall owner")
 if owner_pid <= 1 or os.getppid() != owner_pid:
-    raise SystemExit("uninstall-omaq: uninstall owner mismatch")
+    raise SystemExit("uninstall-harbor: uninstall owner mismatch")
 uid = os.geteuid()
 
 def process_start(pid):
@@ -105,20 +105,20 @@ owner_start = process_start(owner_pid)
 owner_record = f"{owner_pid} {uid} {owner_start}"
 if (not os.path.isabs(state_dir) or os.path.realpath(state_dir) != state_dir or
         marker_path != os.path.join(state_dir, "omaq.uninstalling")):
-    raise SystemExit("uninstall-omaq: OMAQ_STATE must be absolute")
+    raise SystemExit("uninstall-harbor: HARBOR_STATE must be absolute")
 try:
     state_fd = os.open(state_dir, os.O_RDONLY | os.O_DIRECTORY |
                        os.O_CLOEXEC | os.O_NOFOLLOW)
 except FileNotFoundError:
     parent_path, state_name = os.path.split(state_dir)
     if not parent_path or state_name in {"", ".", ".."}:
-        raise SystemExit("uninstall-omaq: unsafe missing OMAQ_STATE path")
+        raise SystemExit("uninstall-harbor: unsafe missing Harbor state path")
     try:
         parent_fd = os.open(parent_path, os.O_RDONLY | os.O_DIRECTORY |
                             os.O_CLOEXEC | os.O_NOFOLLOW)
         parent_info = os.fstat(parent_fd)
         if (parent_info.st_uid != uid or parent_info.st_mode & 0o022):
-            raise OSError("unsafe OMAQ_STATE parent")
+            raise OSError("unsafe Harbor state parent")
         try:
             os.mkdir(state_name, 0o700, dir_fd=parent_fd)
             os.fsync(parent_fd)
@@ -128,11 +128,11 @@ except FileNotFoundError:
         state_fd = os.open(state_dir, os.O_RDONLY | os.O_DIRECTORY |
                            os.O_CLOEXEC | os.O_NOFOLLOW)
     except OSError as error:
-        raise SystemExit(f"uninstall-omaq: cannot establish private OMAQ_STATE: {error}")
+        raise SystemExit(f"uninstall-harbor: cannot establish private Harbor state: {error}")
 state_info = os.fstat(state_fd)
 if (not stat.S_ISDIR(state_info.st_mode) or state_info.st_uid != uid or
         state_info.st_mode & 0o077):
-    raise SystemExit("uninstall-omaq: refusing unsafe OMAQ_STATE directory")
+    raise SystemExit("uninstall-harbor: refusing unsafe Harbor state directory")
 marker_name = "omaq.uninstalling"
 try:
     marker_fd = os.open(marker_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
@@ -141,7 +141,7 @@ except FileExistsError:
     marker_info = os.stat(marker_name, dir_fd=state_fd, follow_symlinks=False)
     if (not stat.S_ISREG(marker_info.st_mode) or marker_info.st_uid != uid or
             marker_info.st_nlink != 1 or marker_info.st_mode & 0o077):
-        raise SystemExit("uninstall-omaq: unsafe uninstall marker already exists")
+        raise SystemExit("uninstall-harbor: unsafe uninstall marker already exists")
     try:
         stale_fd = os.open(marker_name, os.O_RDONLY | os.O_CLOEXEC |
                            os.O_NOFOLLOW, dir_fd=state_fd)
@@ -166,9 +166,9 @@ except FileExistsError:
                             os.O_CLOEXEC | os.O_NOFOLLOW, 0o600,
                             dir_fd=state_fd)
     except PermissionError:
-        raise SystemExit("uninstall-omaq: uninstall marker belongs to a live process")
+        raise SystemExit("uninstall-harbor: uninstall marker belongs to a live process")
     else:
-        raise SystemExit("uninstall-omaq: another uninstall is still running")
+        raise SystemExit("uninstall-harbor: another uninstall is still running")
 os.write(marker_fd, f"{owner_record}\n".encode("ascii"))
 os.fsync(marker_fd)
 os.close(marker_fd)
@@ -185,9 +185,9 @@ def acquire_exclusive_state_lock():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return lock
     except BlockingIOError:
-        raise SystemExit("uninstall-omaq: helper startup is in progress")
+        raise SystemExit("uninstall-harbor: helper startup is in progress")
     except OSError as error:
-        raise SystemExit(f"uninstall-omaq: unsafe helper state lock: {error}")
+        raise SystemExit(f"uninstall-harbor: unsafe helper state lock: {error}")
 
 runtime_names = ("omaq.pid", "omaq.protocol", "omaq.sock")
 runtime_present = set()
@@ -204,10 +204,10 @@ if not runtime_present:
             os.stat(runtime_name, dir_fd=state_fd, follow_symlinks=False)
         except FileNotFoundError:
             continue
-        raise SystemExit("uninstall-omaq: helper runtime appeared during uninstall")
+        raise SystemExit("uninstall-harbor: helper runtime appeared during uninstall")
     raise SystemExit(0)
 if runtime_present != set(runtime_names):
-    raise SystemExit("uninstall-omaq: incomplete helper runtime state")
+    raise SystemExit("uninstall-harbor: incomplete helper runtime state")
 
 def private_read(name, limit):
     fd = os.open(name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
@@ -244,7 +244,7 @@ def clean_stale_runtime():
                 valid_type = stat.S_ISREG(runtime_info.st_mode)
             if (not valid_type or runtime_info.st_uid != uid or
                     runtime_info.st_nlink != 1 or runtime_info.st_mode & 0o077):
-                raise SystemExit("uninstall-omaq: unsafe stale helper runtime state")
+                raise SystemExit("uninstall-harbor: unsafe stale helper runtime state")
             os.unlink(runtime_name, dir_fd=state_fd)
         os.fsync(state_fd)
     finally:
@@ -254,23 +254,23 @@ try:
     protocol = json.loads(private_read("omaq.protocol", 1024))
     pid = int(private_read("omaq.pid", 32).decode("ascii").strip())
 except FileNotFoundError:
-    raise SystemExit("uninstall-omaq: incomplete helper runtime state")
+    raise SystemExit("uninstall-harbor: incomplete helper runtime state")
 except (OSError, ValueError, json.JSONDecodeError) as error:
-    raise SystemExit(f"uninstall-omaq: unsafe helper state: {error}")
+    raise SystemExit(f"uninstall-harbor: unsafe helper state: {error}")
 instance = str(protocol.get("instance", ""))
 marker_start = str(protocol.get("start", ""))
 if (pid <= 1 or int(protocol.get("pid", -1)) != pid or
         not marker_start.isdecimal() or int(marker_start) <= 0 or
         len(instance) != 32 or
         any(char not in "0123456789abcdef" for char in instance)):
-    raise SystemExit("uninstall-omaq: helper pid/protocol marker mismatch")
+    raise SystemExit("uninstall-harbor: helper pid/protocol marker mismatch")
 try:
     start = process_start(pid)
 except (FileNotFoundError, OSError, ValueError, IndexError, UnicodeError) as error:
     try:
         clean_stale_runtime()
     except SystemExit:
-        raise SystemExit(f"uninstall-omaq: unsafe helper process state: {error}")
+        raise SystemExit(f"uninstall-harbor: unsafe helper process state: {error}")
     raise SystemExit(0)
 
 
@@ -346,7 +346,7 @@ except (OSError, ValueError, IndexError, StopIteration, UnicodeError) as error:
         clean_stale_runtime()
     except SystemExit:
         raise SystemExit(
-            f"uninstall-omaq: refusing to signal an unverified process: {error}")
+            f"uninstall-harbor: refusing to signal an unverified process: {error}")
     raise SystemExit(0)
 socket_path = os.path.join(state_dir, "omaq.sock")
 try:
@@ -355,7 +355,7 @@ except FileNotFoundError:
     socket_available = False
 else:
     if not stat.S_ISSOCK(socket_info.st_mode) or socket_info.st_uid != uid:
-        raise SystemExit("uninstall-omaq: refusing unsafe helper socket")
+        raise SystemExit("uninstall-harbor: refusing unsafe helper socket")
     socket_available = True
 
 def same_process():
@@ -442,18 +442,18 @@ try:
                 raise RuntimeError("malformed helper shutdown rejection")
             if reason == "active_groups":
                 raise SystemExit(
-                    f"uninstall-omaq: helper owns {groups} active private group(s); "
+                    f"uninstall-harbor: helper owns {groups} active private group(s); "
                     "leave them before uninstalling")
             raise SystemExit(
-                "uninstall-omaq: helper group state is uncertain; "
+                "uninstall-harbor: helper group state is uncertain; "
                 "finish group cleanup before uninstalling")
 except SystemExit:
     raise
 except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as error:
     raise SystemExit(
-        f"uninstall-omaq: safe helper shutdown unavailable; no signal sent: {error}")
+        f"uninstall-harbor: safe helper shutdown unavailable; no signal sent: {error}")
 if not wait_stopped(5.0):
-    raise SystemExit("uninstall-omaq: helper did not stop; no signal sent")
+    raise SystemExit("uninstall-harbor: helper did not stop; no signal sent")
 deadline = time.monotonic() + 2.0
 runtime_names = ("omaq.pid", "omaq.protocol", "omaq.sock")
 while time.monotonic() < deadline:
@@ -461,7 +461,7 @@ while time.monotonic() < deadline:
         break
     time.sleep(0.05)
 else:
-    raise SystemExit("uninstall-omaq: helper runtime markers were not cleaned")
+    raise SystemExit("uninstall-harbor: helper runtime markers were not cleaned")
 PY
 
 set +e
@@ -484,7 +484,7 @@ try:
         raise OSError("unsafe helper state lock")
     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 except (BlockingIOError, OSError) as error:
-    raise SystemExit(f"uninstall-omaq: cannot lock helper startup during removal: {error}")
+    raise SystemExit(f"uninstall-harbor: cannot lock helper startup during removal: {error}")
 result = subprocess.run(
     [omarchy, "plugin", "remove", "io.zet.harbor", "--yes"],
     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, check=False)
@@ -501,10 +501,10 @@ plugin_backup=$(printf '%s\n' "$remove_output" |
 if ! printf '%s\n' "$remove_output" |
      grep -Eq '^(Removed|Unlinked) io\.zet\.harbor(\.|$)'; then
   if (( remove_status != 0 )); then
-    echo "uninstall-omaq: plugin removal failed before completion" >&2
+    echo "uninstall-harbor: plugin removal failed before completion" >&2
     exit "$remove_status"
   fi
-  echo "uninstall-omaq: remover returned success without a completion marker" >&2
+  echo "uninstall-harbor: remover returned success without a completion marker" >&2
   exit 1
 fi
 
@@ -521,10 +521,10 @@ import sys
 rule_dir = sys.argv[1]
 if (not os.path.isabs(rule_dir) or os.path.normpath(rule_dir) != rule_dir or
         os.path.realpath(rule_dir) != rule_dir):
-    raise SystemExit("uninstall-omaq: unsafe runtime rule path")
+    raise SystemExit("uninstall-harbor: unsafe runtime rule path")
 parent, leaf = os.path.split(rule_dir)
 allowed = re.compile(
-    r"rules(?:-v2)?\.[0-9a-f]{64}(?:\.lock|\.tmp\.[A-Za-z0-9]{6})?"
+    r"rules(?:-v[23])?\.[0-9a-f]{64}(?:\.lock|\.tmp\.[A-Za-z0-9]{6})?"
     r"|rules\.[0-9a-f]{64}\.watch\.lock"
 )
 flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
@@ -581,10 +581,10 @@ def remove_rule_dir():
 try:
     remove_rule_dir()
 except OSError as error:
-    raise SystemExit(f"uninstall-omaq: unsafe runtime rule layout: {error}")
+    raise SystemExit(f"uninstall-harbor: unsafe runtime rule layout: {error}")
 PY
 then
-  echo "uninstall-omaq: runtime rule cleanup refused; inspect $rule_dir manually" >&2
+  echo "uninstall-harbor: runtime rule cleanup refused; inspect $rule_dir manually" >&2
 fi
 
 safe_delete_directory() {
@@ -599,10 +599,10 @@ uid = os.geteuid()
 if (not os.path.isabs(path) or os.path.normpath(path) != path or
         os.path.realpath(path) != path or os.path.realpath(home) != home or
         path in {"/", home}):
-    raise SystemExit("uninstall-omaq: refusing unsafe data path")
+    raise SystemExit("uninstall-harbor: refusing unsafe data path")
 parent, leaf = os.path.split(path)
 if not leaf or leaf in {".", ".."}:
-    raise SystemExit("uninstall-omaq: refusing unsafe data path")
+    raise SystemExit("uninstall-harbor: refusing unsafe data path")
 flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
 parent_fd = os.open(parent, flags)
 try:
@@ -746,13 +746,15 @@ add_cleanup_directory() {
 }
 
 state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
-download_dir=${OMAQ_DOWNLOAD_DIR:-}
+download_dir=${HARBOR_DOWNLOAD_DIR:-}
+[[ $download_dir == /* ]] || download_dir=${OMAQ_DOWNLOAD_DIR:-}
 [[ $download_dir == /* ]] || download_dir=${XDG_DOWNLOAD_DIR:-}
 [[ $download_dir == /* ]] || download_dir="$HOME/Downloads"
 if (( ! assume_yes && remove_status == 0 )); then
-  add_cleanup_directory "${OMAQ_HOME:-"$HOME/.local/share/omaq"}" \
+  add_cleanup_directory "${HARBOR_HOME:-${OMAQ_HOME:-"$HOME/.local/share/omaq"}}" \
     "private identity, contacts, groups, avatars, history, and Ratchet state"
-  add_cleanup_directory "$download_dir/omaq" "received files"
+  add_cleanup_directory "$download_dir/Harbor" "received files"
+  add_cleanup_directory "$download_dir/omaq" "legacy received files"
   add_cleanup_directory "$state_home/omaq-deploy-backups" "deployment backups"
   add_cleanup_directory "$state_home/omaq-source-updates" "active retained source-update trees"
   add_cleanup_directory "$state_home/omaq-source-update-archive" "older retained source-update trees"
@@ -764,8 +766,8 @@ if (( ! assume_yes && remove_status == 0 )); then
 fi
 
 if (( remove_status != 0 )); then
-  echo "uninstall-omaq: plugin removal completed, but Omarchy reported a later error" >&2
-  echo "uninstall-omaq: all data was retained and dependency packages were untouched" >&2
+  echo "uninstall-harbor: plugin removal completed, but Omarchy reported a later error" >&2
+  echo "uninstall-harbor: all data was retained and dependency packages were untouched" >&2
   exit "$remove_status"
 fi
 
@@ -797,7 +799,7 @@ if (( ! assume_yes )); then
     fi
   done
 else
-  echo "uninstall-omaq: --yes retains all private data, downloads, and backups"
+  echo "uninstall-harbor: --yes retains all private data, downloads, and backups"
 fi
 
 # A confirmed parent must never override No for a nested data directory.
@@ -835,7 +837,7 @@ for path in "${selected_paths[@]}"; do
   else
     parent=${path%/*}
     leaf=${path##*/}
-    printf 'uninstall-omaq: deletion failed for %q; cleanup may be partial; inspect that path and %q for a hidden .%s.omaq-delete.* remainder\n' \
+    printf 'uninstall-harbor: deletion failed for %q; cleanup may be partial; inspect that path and %q for a hidden .%s.omaq-delete.* remainder\n' \
       "$path" "$parent" "$leaf" >&2
     cleanup_failed=1
     break

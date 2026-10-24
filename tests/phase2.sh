@@ -5,6 +5,15 @@ root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 bin="$root/helper/omaq"
 [ -x "$bin" ] || { echo "phase2: no helper" >&2; exit 1; }
 
+wait_event() {
+    wait_count=0
+    while ! grep -a -q "$2" "$1"; do
+        wait_count=$((wait_count + 1))
+        [ "$wait_count" -lt 100 ] || { echo "phase2: timed out waiting for $2" >&2; return 1; }
+        sleep 0.1
+    done
+}
+
 real_home="${HOME}/.local/share/omaq"
 ha=$(mktemp -d /tmp/omaq-p2a-XXXXXX)
 sa=$(mktemp -d /tmp/omaq-p2as-XXXXXX)
@@ -33,13 +42,13 @@ case "$ha" in
 esac
 
 # --- QR from a gold invite URL (no network) ---
-url_gold="omaq://invite/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab?i=abc1&e=2000000000&k=direct"
+url_gold="harbor://invite/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab?i=abc1&e=2000000000&k=direct"
 mkfifo "$holda"
 OMAQ_HOME="$ha" OMAQ_STATE="$sa" "$bin" >"$fa" 2>"$fa.err" <"$holda" &
 pa=$!
 exec 3>"$holda"
 sleep 0.3
-printf '{"op":"invite.qr","payload":"%s","path":"%s"}\n' "$url_gold" "$png" >&3
+printf '{"op":"invite.qr","payload":"  %s  ","path":"%s"}\n' "$url_gold" "$png" >&3
 i=0
 qr_ok=0
 while [ "$i" -lt 40 ]; do
@@ -94,18 +103,18 @@ fi
 # Accept first while B is not yet a friend, then compare safety codes.
 before=$(wc -l <"$fa")
 echo '{"op":"invite.create","ttlSec":86400,"kind":"bogus","request":"invite-phase2-bogus"}' >&3
-sleep 0.2
+wait_event "$fa" '"request":"invite-phase2-bogus"'
 tail -n +"$((before + 1))" "$fa" | grep -a '"code":"unsupported"' |
 	grep -a -q '"request":"invite-phase2-bogus"' || {
 	echo "phase2: malformed invite kind was accepted or uncorrelated" >&2
 	exit 1
 }
-if tail -n +"$((before + 1))" "$fa" | grep -a -q '"event":"invite","url":"omaq://'; then
+if tail -n +"$((before + 1))" "$fa" | grep -E -a -q '"event":"invite","url":"(omaq|harbor)://'; then
 	echo "phase2: malformed invite kind created a link" >&2
 	exit 1
 fi
 echo '{"op":"invite.create","ttlSec":2147483647,"kind":"direct","request":"invite-phase2-first"}' >&3
-sleep 0.3
+wait_event "$fa" '"request":"invite-phase2-first"'
 url=$(grep -a '"url"' "$fa" | tail -1 | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
 invite_event=$(grep -a '"event":"invite"' "$fa" | tail -1)
 printf '%s\n' "$invite_event" |
@@ -124,13 +133,13 @@ if [ -z "$url" ]; then
 	echo "phase2: no invite url" >&2
 	exit 1
 fi
-req_before=$(grep -a -c '"request"' "$fa" 2>/dev/null || true)
+req_before=$(grep -a -c '"event":"request","kind":"direct"' "$fa" 2>/dev/null || true)
 req_before=${req_before:-0}
 printf '{"op":"invite.redeem","payload":"%s","id":"redeem-phase2-first"}\n' "$url" >&4
 ok=0
 i=0
 while [ "$i" -lt 90 ]; do
-	req_now=$(grep -a -c '"request"' "$fa" 2>/dev/null || true)
+	req_now=$(grep -a -c '"event":"request","kind":"direct"' "$fa" 2>/dev/null || true)
 	req_now=${req_now:-0}
 	if [ "$req_now" -gt "$req_before" ]; then
 		ok=1
@@ -153,9 +162,9 @@ request_key=$(grep -a '"event":"request","kind":"direct"' "$fa" | tail -1 |
 [ "${#request_key}" -eq 64 ] || { echo "phase2: request key missing" >&2; exit 1; }
 printf '{"op":"contact.decide","id":"x","key":"%s","accept":true}\n' \
 	"$request_key" >&3
-sleep 1
+wait_event "$fa" '"event":"contact.decided"'
 grep -a '"event":"invite"' "$fa" | tail -1 |
-	grep -a -q '"url":"","expires":0,"op":"clear"' || {
+	grep -a -q '"url":"","expires":0,"bearer":false,"op":"clear"' || {
 	echo "phase2: accepted invite state was not cleared" >&2
 	exit 1
 }
@@ -169,7 +178,7 @@ key_b=$(grep -a '"event":"friend.info"' "$fb" | grep -a '"id":"0"' | tail -1 |
 }
 before=$(wc -l <"$fa")
 printf '%s\n' '{"op":"safety.get","conversation":"0","key":"0000000000000000000000000000000000000000000000000000000000000000","id":"safety-stale-key"}' >&3
-sleep 0.2
+wait_event "$fa" '"request":"safety-stale-key"'
 tail -n +"$((before + 1))" "$fa" | grep -a '"code":"forbidden"' |
 	grep -a -q '"request":"safety-stale-key"' || {
 	echo "phase2: stale safety key was accepted" >&2
@@ -217,7 +226,8 @@ done
 [ "$i" -lt 30 ] || { echo "phase2: benign direct invite rejection was not specific and correlated" >&2; exit 1; }
 echo '{"op":"status","id":"phase2-after-benign-reject-a"}' >&3
 echo '{"op":"status","id":"phase2-after-benign-reject-b"}' >&4
-sleep 0.2
+wait_event "$fa" '"request":"phase2-after-benign-reject-a"'
+wait_event "$fb" '"request":"phase2-after-benign-reject-b"'
 if ! grep -a '"event":"snapshot"' "$fa" |
      grep -a '"request":"phase2-after-benign-reject-a"' |
      tail -1 | grep -a -q '"addr"' ||
@@ -250,12 +260,12 @@ fi
 req_before=$(grep -a '"event":"request"' "$fa" | grep -a -c '"kind":"direct"' || true)
 req_before=${req_before:-0}
 echo '{"op":"invite.create","ttlSec":86400,"kind":"direct","request":"invite-phase2-revoke-source"}' >&3
-sleep 0.3
+wait_event "$fa" '"request":"invite-phase2-revoke-source"'
 url2=$(grep -a '"url"' "$fa" | tail -1 | sed -n 's/.*"url":"\([^"]*\)".*/\1/p')
 echo '{"op":"invite.revoke","request":"invite-phase2-revoke"}' >&3
-sleep 0.2
+wait_event "$fa" '"request":"invite-phase2-revoke"'
 grep -a '"event":"invite"' "$fa" | tail -1 |
-	grep -a -q '"url":"","expires":0,"op":"revoke","request":"invite-phase2-revoke"' || {
+	grep -a -q '"url":"","expires":0,"bearer":false,"op":"revoke","request":"invite-phase2-revoke"' || {
 	echo "phase2: invite revoke was not correlated" >&2
 	exit 1
 }
@@ -288,12 +298,12 @@ if [ -z "$addr1" ] || [ -z "$addr2" ] || [ "$addr1" = "$addr2" ]; then
 	echo "phase2: nospam did not change addr" >&2
 	exit 1
 fi
-req_before=$(grep -a -c '"request"' "$fa" 2>/dev/null || true)
+req_before=$(grep -a -c '"event":"request","kind":"direct"' "$fa" 2>/dev/null || true)
 req_before=${req_before:-0}
 printf '{"op":"invite.redeem","payload":"%s"}\n' "$url3" >&4
 i=0
 while [ "$i" -lt 8 ]; do
-	req_now=$(grep -a -c '"request"' "$fa" 2>/dev/null || true)
+	req_now=$(grep -a -c '"event":"request","kind":"direct"' "$fa" 2>/dev/null || true)
 	req_now=${req_now:-0}
 	if [ "$req_now" -gt "$req_before" ]; then
 		echo "phase2: nospam-voided invite still requested" >&2

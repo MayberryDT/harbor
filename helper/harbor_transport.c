@@ -85,6 +85,9 @@ int harbor_transport_send(harbor_transport *t, int group, uint32_t target,
   if (n > HARBOR_WIRE_MAX || !n)
     return -1;
   for (int i = 0; i < SLOTS; i++) {
+    if (t->tx[i].data && t->tx[i].group == group && t->tx[i].target == target &&
+        t->tx[i].size == n && !strcmp(t->tx[i].binding,binding) && !memcmp(t->tx[i].data,text,n))
+      return 1; /* Retry of this exact queued envelope; retain its progress. */
     if (t->tx[i].data && t->tx[i].group == group && t->tx[i].target == target)
       pending = 1;
     if (!t->tx[i].data && slot < 0)

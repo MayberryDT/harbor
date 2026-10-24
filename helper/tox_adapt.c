@@ -956,8 +956,7 @@ struct omaq_tox *omaq_tox_open(const char *home, const char *pass, int *err_out)
 			toxav_callback_call_state(t->av, on_av_state, t);
 		}
 	}
-	if (!loaded_savedata && tox_self_get_name_size(t->tox) == 0)
-		(void)omaq_tox_set_name(t, "omaq");
+	/* New identities stay unnamed until the person completes Harbor setup. */
 	bootstrap_tox(t);
 	t->next_bootstrap = time(NULL) + 10;
 	if (!loaded_savedata && omaq_tox_save(t) < 0) {
@@ -1283,6 +1282,27 @@ int omaq_tox_friend_add(struct omaq_tox *t, const char *addr_hex, const char *ms
 	return 0;
 }
 
+int omaq_tox_friend_reinvite(struct omaq_tox *t,const char *addr_hex,const char *msg,uint32_t *fn_out)
+{
+    uint8_t addr[TOX_ADDRESS_SIZE];
+    if(!t || !t->tox || !addr_hex || !msg || strlen(addr_hex)!=sizeof(addr)*2 || hex_in(addr_hex,addr,sizeof(addr)))return OMAQ_TOX_ADD_REJECTED;
+    uint32_t old=omaq_tox_friend_by_pk(t,addr);
+    if(old==UINT32_MAX)return omaq_tox_friend_add(t,addr_hex,msg,fn_out);
+    Tox_Err_Friend_Delete deleted;
+    if(!tox_friend_delete(t->tox,old,&deleted))return OMAQ_TOX_ADD_REJECTED;
+    Tox_Err_Friend_Add added;
+    uint32_t fresh=tox_friend_add(t->tox,addr,(const uint8_t *)msg,strlen(msg),&added);
+    if(added!=TOX_ERR_FRIEND_ADD_OK){
+        (void)tox_friend_add_norequest(t->tox,addr,&added);
+        return added==TOX_ERR_FRIEND_ADD_OK?OMAQ_TOX_ADD_REJECTED:OMAQ_TOX_ADD_STATE_FAILED;
+    }
+    /* Save only the final invited friendship. A crash retains either that
+     * version or the original provisional friendship plus the add intent. */
+    if(omaq_tox_save(t)<0)return OMAQ_TOX_ADD_STATE_FAILED;
+    if(fn_out)*fn_out=fresh;
+    return 0;
+}
+
 int omaq_tox_friend_accept(struct omaq_tox *t, const uint8_t *pk32)
 {
 	Tox_Err_Friend_Add err = TOX_ERR_FRIEND_ADD_OK;
@@ -1412,12 +1432,12 @@ static size_t group_nickname(struct omaq_tox *t, uint8_t *out, size_t n)
 {
 	size_t len;
 
-	if (!t || !t->tox || !out || n < 5)
+	if (!t || !t->tox || !out || n < 7)
 		return 0;
 	len = tox_self_get_name_size(t->tox);
 	if (len == 0 || len >= n) {
-		memcpy(out, "omaq", 4);
-		return 4;
+		memcpy(out, "Harbor", 6);
+		return 6;
 	}
 	tox_self_get_name(t->tox, out);
 	return len;
