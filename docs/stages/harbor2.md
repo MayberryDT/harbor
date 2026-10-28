@@ -314,3 +314,62 @@ plugin validation and diff check passed; ChatSurface/Service qmllint returned 0
 with warnings. Focused review found no remaining defect after password retention
 and verification timeout repairs. Three QML files installed locally; helper PID
 4175800 remained current and unchanged. No release or push performed.
+
+## Attachment composer lock, 28 October 2026
+
+Removed the conversation-wide attachment lock from text paste, file selection,
+and image send. The Service keeps up to 16 additional outgoing attachments in
+memory, in submission order per conversation, while the helper finishes the
+active transfer. Other conversations can proceed independently. Stable contact
+keys and helper compatibility are rechecked before dispatch. Cancel sends drops
+that conversation's queue and cancels its active transfer; identity/helper resets
+and contact removal discard queued stages. Files rejected by image inspection
+send directly from the native chooser without the former extra Send action.
+Incoming acceptance and helper transport validation remain unchanged.
+
+Verification: Halla source snapshot at
+`/home/halla/workspaces/harbor-attachment-check`; logs under
+`/home/halla/build/harbor/attachment-composer-20261028`. QML lint and architecture
+checks passed; lint reports the existing unresolved shell imports/unqualified
+access warnings. Independent review identified FIFO, cancellation and global
+capacity issues, corrected before the final checks. `git diff --check` passed.
+The Halla SDK lacks Quickshell and Omarchy shell components, so native interaction,
+clipboard/queue E2E and recipient transfer behavior remain unverified. No live
+plugin synchronization, helper restart, commit or publication was performed.
+
+### 1.3.2 delivery verification
+
+Native Dell task `task_390665c129dd40efbcdf847c7eb46aa8` passed
+`tests/chat-composer-parity.sh` and `tests/chat-input-scroll.sh`, plus a composer
+variant replacing `function fileSendingFor(conv) { return false }` with
+`function fileSendingFor(conv) { return true }`. The variant proves composer
+image send and text paste remain available under an active-transfer projection;
+it does not prove the Service queue's complete network transfer journey.
+The disposable task workspace retains `composer.log`, `input.log`,
+`busy-composer.log` and the candidate source. Native jobs ended successfully;
+ibara finish confirmed cleanup. Source SHA-256 values:
+
+- Service.qml: `ef6354998fe04d43829c3d367a87f3c877ea632cc626e7c071fea68eac9a046e`
+- pages/ChatPage.qml: `779804b1cbfb99328786798f7879aa2cd49b48cc816e6593f1ed5b272b5c74d1`
+
+An independent release review approved refreshing only these files' raw and
+formatted plaintext-policy digests; existing sink/write allowlists are unchanged.
+The initial root-run headless check was invalidated by permission-test behavior;
+checks were rerun as Halla's unprivileged UID. A stray QML file introduced only
+in the disposable snapshot was removed before the final source-policy check.
+Release logs are under `/home/halla/build/harbor/attachment-release-20261028/source/`.
+
+Live update: copied only Service.qml, pages/ChatPage.qml and manifest.json from
+`/home/tyler/Work/harbor` to
+`/home/tyler/.config/omarchy/plugins/io.zet.harbor`, after announcing the paths and
+UI reload. Source/destination hashes match; manifest validation passed,
+`rescanPlugins` completed and shell ping returned `ok`. The existing helper PID
+3492 remained running. Public-source backup: `/tmp/harbor-132-before-fgoyvd87`.
+No private state or helper binary was copied.
+
+Final release checks: unprivileged Halla `make test-ci` passed, including the
+plaintext gate, C/CLI suites, no-Signal build, install/update/uninstall and IPC
+regression checks. The uninstall mount-boundary subcheck was skipped because a
+user mount namespace is unavailable. `release-final.log` is the complete receipt.
+The complete `make test` native suite and real queued multi-file relay E2E were
+not run; native coverage is the three composer/input runs described above.

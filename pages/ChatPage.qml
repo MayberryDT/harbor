@@ -1994,9 +1994,10 @@ FocusScope {
     if (!path || root.demo || !root.attachmentsAvailable || !root.service ||
         !root.directBindingValid)
       return false
-    if (!root.service.sendFile(path, root.conversation, "image", root.peerKey)) {
+    if (!root.service.sendFile(path, root.conversation, "image", root.peerKey,
+          root.pendingImageStageRequest)) {
       var code = String(root.service.lastError || "helper_unavailable")
-      root.fileStatus = code === "busy" ? "A file is already sending"
+      root.fileStatus = code === "queue_full" ? "File queue is full — try again after a transfer finishes"
         : code === "helper_update_required" ? "Restart the Harbor helper before sending group images"
         : code === "helper_handshake_pending" ? "Wait for Harbor to reconnect, then send again"
         : code === "identity_changed" ? "The conversation identity changed"
@@ -2005,6 +2006,11 @@ FocusScope {
       fileStatusTimer.interval = 3000
       fileStatusTimer.restart()
       return false
+    }
+    if (root.service.fileQueuedFor && root.service.fileQueuedFor(root.conversation, path)) {
+      root.releasePendingImageAfterSend()
+      root.restoreOutgoingFileStatus()
+      return true
     }
     var transfer = root.service.outgoingFile(root.conversation)
     root.pendingImageSendRequest = String(transfer.request || "")
@@ -2195,8 +2201,7 @@ FocusScope {
     var selectedPath = String(path || "").trim()
     if (!selectedPath)
       return
-    if (root.pendingImageSendRequest !== "" ||
-        (root.service && root.service.fileSendingFor(root.conversation))) {
+    if (root.pendingImageSendRequest !== "") {
       root.fileStatus = "A file is already sending"
       return
     }
@@ -2214,7 +2219,7 @@ FocusScope {
           root.attachmentInspectionRequest)) {
       root.attachmentInspectionPath = ""
       root.attachmentInspectionRequest = ""
-      root.fileStatus = "Ready to send as a file"
+      root.sendSelectedFile()
       return
     }
     attachmentInspectionTimer.restart()
@@ -2235,9 +2240,7 @@ FocusScope {
         root.fileStatus = "Clipboard does not contain a supported PNG, JPEG, or WebP image"
         root.fileStatusPath = ""
       } else {
-        root.fileStatus = "Ready to send as a file"
-        root.fileStatusPath = path
-        root.showFile = true
+        root.sendSelectedFile()
       }
       return
     }
@@ -2346,9 +2349,8 @@ FocusScope {
       return
     }
     if (clipboardTypeProbe.running || clipboardImageWriter.running ||
-        root.clipboardStageRequest !== "" || root.pendingImageSendRequest !== "" ||
-        (root.service && root.service.fileSendingFor(root.conversation))) {
-      root.fileStatus = "An attachment action is already running"
+        root.clipboardStageRequest !== "" || root.pendingImageSendRequest !== "") {
+      input.paste()
       return
     }
     root.clipboardTypeExitCode = -1
@@ -2493,14 +2495,16 @@ FocusScope {
       return
     }
     if (!service.sendFile(path, root.conversation, "file", root.peerKey)) {
-      root.fileStatus = "A file is already sending"
+      root.fileStatus = service.lastError === "queue_full"
+        ? "File queue is full — try again after a transfer finishes"
+        : "File could not be sent"
       fileStatusTimer.interval = 3000
       fileStatusTimer.restart()
       return
     }
     root.closeFileChooser()
-    root.fileStatus = "Sending…"
-    root.fileStatusPath = path
+    root.restoreOutgoingFileStatus()
+    input.forceActiveFocus()
   }
 
   function restoreFileNotice() {
@@ -5069,14 +5073,12 @@ FocusScope {
             id: chooseFileBtn
             text: "Change"
             bordered: true
-            enabled: !root.service || !root.service.fileSendingFor(root.conversation)
             onClicked: root.openFilePicker()
           }
           ChatBtn {
             id: sendFileBtn
             text: "Send"
             bordered: true
-            enabled: !root.service || !root.service.fileSendingFor(root.conversation)
             onClicked: root.sendSelectedFile()
           }
         }
@@ -5097,7 +5099,10 @@ FocusScope {
 
           Harbor.SafeText {
             Layout.fillWidth: true
-            text: root.reactionStatus !== "" ? root.reactionStatus : root.fileStatus
+            text: root.reactionStatus !== "" ? root.reactionStatus : root.fileStatus +
+              (root.service && root.service.queuedFileCount &&
+               root.service.queuedFileCount(root.conversation) > 0
+                ? " · " + root.service.queuedFileCount(root.conversation) + " queued" : "")
             color: root.fileStatus === "Sending…" && root.reactionStatus === ""
               ? root.accent : Qt.darker(root.fg, 1.35)
             font.family: root.fontFamily
@@ -5129,7 +5134,7 @@ FocusScope {
 
         ChatBtn {
           visible: root.service && root.service.fileSendingFor(root.conversation)
-          text: "Cancel"
+          text: "Cancel sends"
           bordered: true
           onClicked: root.cancelOutgoingFile()
         }
@@ -5260,8 +5265,7 @@ FocusScope {
               ? "Send image" : "Image sending unavailable"
             enabled: root.pendingImageSendRequest === "" && root.service &&
               !!root.service.supportsAttachments && root.attachmentsAvailable &&
-              root.directBindingValid &&
-              !root.service.fileSendingFor(root.conversation)
+              root.directBindingValid
             onClicked: root.sendPendingImage()
           }
 

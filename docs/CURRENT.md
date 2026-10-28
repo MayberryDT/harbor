@@ -1,5 +1,11 @@
 # Harbor fork status
 
+Harbor 1.3.2 removes the attachment composer lock: text paste and additional
+file/image submissions work during active transfers, with a bounded in-memory
+queue and conversation-scoped Cancel sends. Ordinary files send directly from
+the native chooser. Recipient acceptance is unchanged. See the
+[release notes](releases/1.3.2.md) and [verification](stages/harbor2.md).
+
 Image preview fix (published and installed in Harbor 1.3.1, 24 October 2026): image clicks now open a
 conversation-local preview with Zoom in/Fit, scrolling, Close and Escape.
 This avoids the reproduced imv-wayland crash without changing the default
@@ -12,7 +18,7 @@ handler and erased the draft. The header now absorbs those clicks, active edits
 survive profile refreshes, and valid submissions show helper-readiness feedback
 in the lower frame. See [verification and remaining limits](stages/nickname-draft.md).
 
-The [living implementation plan](IMPLEMENTATION_PLAN.md) owns expanded product scope, authority and next action. Harbor 1.3.1 is the released baseline. Harbor 2 is an uncommitted implementation under test; [its acceptance ledger](stages/harbor2.md) records completed slices and remaining scope. Multi-device backend checks do not imply the complete native experience has shipped.
+The [living implementation plan](IMPLEMENTATION_PLAN.md) owns expanded product scope, authority and next action. Harbor 1.3.2 is the released baseline. Previously committed Harbor 2 work is included, while the larger roadmap remains under test; [its acceptance ledger](stages/harbor2.md) records completed slices and remaining scope. Multi-device backend checks do not imply the complete native experience has shipped.
 
 Harbor expands text to 64 KiB, files to 1 GiB and inline images to 64 MiB;
 see [Harbor implementation and evidence](HARBOR.md). The following retained

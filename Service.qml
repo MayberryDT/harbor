@@ -498,6 +498,7 @@ Item {
   property bool pendingFile: false
   property var fileOffers: ({})
   property var outgoingFiles: ({})
+  property var queuedFiles: []
   property var fileNotices: ({})
   property int fileNoticeTick: 0
   property int fileRequestSequence: 0
@@ -1051,6 +1052,7 @@ Item {
       root.lastFileTick = root.lastFileTick + 1
     }
     root.fileOffers = root.withoutConversation(root.fileOffers, id)
+    root.discardQueuedFiles(id)
     root.outgoingFiles = root.withoutConversation(root.outgoingFiles, id)
     root.fileNotices = root.withoutConversation(root.fileNotices, id)
     root.peerTypingByConv = root.withoutConversation(root.peerTypingByConv, id)
@@ -4172,7 +4174,56 @@ Item {
     return sendImmediateOp({ op: "attachment.inspect", path: attachmentPath,
       id: requestId })
   }
-  function sendFile(path, conv, attachmentKind, expectedKey) {
+  function queuedFileCount(conv) {
+    return root.queuedFiles.filter(function(item) {
+      return item.conversation === String(conv)
+    }).length
+  }
+  function fileQueuedFor(conv, path) {
+    return root.queuedFiles.some(function(item) {
+      return item.conversation === String(conv) && item.path === String(path)
+    })
+  }
+  function discardQueuedFiles(conv) {
+    var kept = []
+    for (var i = 0; i < root.queuedFiles.length; i++) {
+      var item = root.queuedFiles[i]
+      if (conv && item.conversation !== String(conv)) {
+        kept.push(item)
+      } else if (item.stageRequest) {
+        root.discardAttachmentStage(item.path, item.stageRequest)
+      }
+    }
+    root.queuedFiles = kept
+  }
+  Timer {
+    interval: 100
+    running: root.queuedFiles.length > 0 && !root.awaitingHelperInstance &&
+      root.helperCompatibility === "compatible"
+    repeat: true
+    onTriggered: {
+      for (var i = 0; i < root.queuedFiles.length; i++) {
+        var item = root.queuedFiles[i]
+        if (root.outgoingFile(item.conversation).pending)
+          continue
+        var remaining = root.queuedFiles.slice()
+        remaining.splice(i, 1)
+        root.queuedFiles = remaining
+        if (!root.sendFile(item.path, item.conversation, item.kind, item.key,
+                           item.stageRequest, true)) {
+          if (item.stageRequest)
+            root.discardAttachmentStage(item.path, item.stageRequest)
+          root.lastFileConv = item.conversation
+          root.lastFileDir = "out"
+          root.lastFileState = "failed"
+          root.lastFileError = root.lastError || "helper_unavailable"
+          root.lastFileTick++
+        }
+        break
+      }
+    }
+  }
+  function sendFile(path, conv, attachmentKind, expectedKey, stageRequest, dispatchQueued) {
     var c = String(conv || root.lastConversation || "")
     var attachmentPath = String(path || "")
     var kind = String(attachmentKind || "file")
@@ -4189,8 +4240,6 @@ Item {
       failure = "helper_update_required"
     else if (root.awaitingHelperInstance || root.helperCompatibility !== "compatible")
       failure = "helper_handshake_pending"
-    else if (root.outgoingFile(c).pending)
-      failure = "busy"
     if (failure !== "") {
       root.lastError = failure
       root.lastErrorConv = c
@@ -4198,6 +4247,18 @@ Item {
     }
     if (group)
       bindingKey = ""
+    if (root.outgoingFile(c).pending || (!dispatchQueued &&
+        root.queuedFiles.some(function(item) { return item.conversation === c }))) {
+      if (root.queuedFiles.length >= 16) {
+        root.lastError = "queue_full"
+        root.lastErrorConv = c
+        return false
+      }
+      root.queuedFiles = root.queuedFiles.concat([{ conversation: c,
+        path: attachmentPath, kind: kind, key: bindingKey,
+        stageRequest: String(stageRequest || "") }])
+      return true
+    }
     root.fileRequestSequence = root.fileRequestSequence + 1
     var requestId = Date.now().toString(36) + "-" + root.fileRequestSequence.toString(36) +
       "-" + Math.floor(Math.random() * 0x100000000).toString(36)
@@ -4232,6 +4293,7 @@ Item {
                    String(transfer.key || "") !== "")) ||
         !transfer.pending || transfer.cancelRequested)
       return false
+    root.discardQueuedFiles(c)
     root.setOutgoingFile(c, {
       id: transfer.id || "",
       path: transfer.path || "",
@@ -4607,8 +4669,13 @@ Item {
   }
 
   function failActiveOutgoingFiles(reason) {
+    // Queued paths and stages belong to this helper/client lifetime.
+    var queuedConversations = root.queuedFiles.map(function(item) {
+      return item.conversation
+    })
+    root.discardQueuedFiles("")
     var next = {}
-    var failed = []
+    var failed = queuedConversations
     var failedRequests = {}
     var failedTransferIds = {}
     var key
